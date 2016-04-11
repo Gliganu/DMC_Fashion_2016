@@ -5,6 +5,12 @@ from sklearn.cross_validation import train_test_split
 
 
 
+def performDateEnginnering(rawData, dateColumn):
+
+    rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
+    rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
+
+    return rawData
 
 
 def getFeatureEngineeredData(data,predictionColumnId = None):
@@ -25,13 +31,12 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp']
+    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
 
 
-    print "Kept columns {}".format(keptColumns)
 
     data = data[keptColumns]
 
@@ -41,6 +46,13 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     #restrict prediction to 0/1 for now
     filter = (data['returnQuantity'] == 0) | (data['returnQuantity'] == 1)
     data = data[filter]
+
+
+    # data = performDateEnginnering(data,'orderDate')
+    # data = data.drop(['orderDate'],1)
+
+    print "Kept columns {}".format(data.columns)
+
 
 
 
