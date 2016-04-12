@@ -5,12 +5,34 @@ from sklearn.cross_validation import train_test_split
 
 
 
-def performDateEnginnering(rawData, dateColumn):
+def performDateEngineering(rawData, dateColumn):
 
     rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
     rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
 
+    rawData = rawData.drop([dateColumn], 1)
+
     return rawData
+
+
+def performOHEOnColumn(data,columnName):
+
+    #adding all the extra columns
+    data = pd.concat([data, pd.get_dummies(data[columnName], prefix=columnName)], axis=1)
+
+    #dropping the "source" column
+    data = data.drop([columnName], 1)
+
+    return data
+
+
+def performSizeCodeEngineering(data):
+
+    #drop everything that is not digit. About 200k examples ( maybe not the best way )
+    data = data[data['sizeCode'].isdigit()]
+
+
+    return data
 
 
 def getFeatureEngineeredData(data,predictionColumnId = None):
@@ -31,12 +53,10 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID' ]
+    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
-
-    print("Kept columns {}".format(keptColumns))
 
     data = data[keptColumns]
 
@@ -48,16 +68,22 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     data = data[filter]
 
 
-    # data = performDateEnginnering(data,'orderDate')
-    # data = data.drop(['orderDate'],1)
+    data = performOHEOnColumn(data, 'deviceID')
 
+    data = performOHEOnColumn(data, 'paymentMethod')
+
+    # data = performSizeCodeEngineering(data)
+
+    # data = performDateEngineering(data, 'orderDate')
+
+    print("Kept columns {}".format(data.columns))
 
     return data
 
 
 def getTrainAndTestData():
 
-    data = FileManager.getWholeTrainingData()
+    data = FileManager.get1000kTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
