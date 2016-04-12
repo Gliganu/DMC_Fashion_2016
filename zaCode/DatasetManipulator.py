@@ -29,11 +29,20 @@ def performOHEOnColumn(data,columnName):
 def performSizeCodeEngineering(data):
 
     #drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].isdigit()]
-
+    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
 
     return data
 
+
+def addNewFeatures(data):
+
+    #see whether the product was overpriced. price > recommended
+    data['overpriced'] = data['price'] > data['rrp']
+
+    #see how much the data was discounted ( if price == 0, divide by 1 )
+    data['discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
+
+    return data
 
 def getFeatureEngineeredData(data,predictionColumnId = None):
 
@@ -53,7 +62,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod' ]
+    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -72,7 +81,10 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
 
     data = performOHEOnColumn(data, 'paymentMethod')
 
-    # data = performSizeCodeEngineering(data)
+    data = performSizeCodeEngineering(data)
+
+    #construct additional features as a mixture of various ones
+    data = addNewFeatures(data)
 
     # data = performDateEngineering(data, 'orderDate')
 
@@ -83,7 +95,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
 
 def getTrainAndTestData():
 
-    data = FileManager.get1000kTrainingData()
+    data = FileManager.get100kTrainingData()
 
     predictionColumnId = 'returnQuantity'
 

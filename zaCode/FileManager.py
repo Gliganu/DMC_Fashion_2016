@@ -10,6 +10,14 @@ def getWholeTrainingData():
 
     return data
 
+def getTestData():
+
+    inputFileName = '..\\data\\orders_class.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
+
 # added these 'peasanty' functions becauuse although we could've read the whole csv and trim the data frame after, it's faster this way
 def get1kTrainingData():
 

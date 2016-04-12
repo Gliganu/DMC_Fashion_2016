@@ -1,9 +1,10 @@
 import zaCode.ClassifierTrainer as ClassifierTrainer
 import zaCode.DatasetManipulator as DatasetManipulator
 import zaCode.Validator as Validator
+import zaCode.FileManager as FileManager
 
 import time
-
+import numpy as np
 
 def makePrediction():
     # construct Train & Test Data
@@ -18,11 +19,19 @@ def makePrediction():
     # assessing the performance
     Validator.performValidation(yPred, yTest)
 
+
+def play():
+    data = FileManager.get1000kTrainingData()
+
+
+
+
 if __name__ == '__main__':
     startTime = time.time()
 
     makePrediction()
 
+    # play()
     # Visualizer.calculateLearningCurve()
 
 
