@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-import DatasetManipulator
-import ClassifierTrainer
+import zaCode.DatasetManipulator as DatasetManipulator
+import zaCode.ClassifierTrainer as ClassifierTrainer
 
 from sklearn import cross_validation
 from sklearn.learning_curve import learning_curve
@@ -47,6 +47,35 @@ from sklearn.learning_curve import validation_curve
 #
 #
 #
+
+def calculateLearningCurve():
+    # classifier = ClassifierTrainer.constructGradientBoostingClassifier()
+    # trainData = dataReader.getTrainData()
+    #
+    # # feature engineering
+    # trainData =  featureExtractor.convertTargetFeatureToNumeric(trainData)
+    # xTrain, yTrain = featureExtractor.getRegularFeatures(trainData, True)
+
+    # construct Train & Test Data
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+
+    # training the classifier
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+
+
+    trainSizes =  np.linspace(100000,1218424,5,dtype=int)
+
+    plot_learning_curve(classifier,xTrain,yTrain,trainSizes)
+
+
+
+def plot_learning_curve(estimator, X, y,train_sizes):
+
+    n_jobs = -1
+
+    cv = cross_validation.ShuffleSplit(len(X), n_iter=1, test_size=0.3)
+
+    plt.figure()
 
     plt.xlabel("Training examples")
     plt.ylabel("Score")

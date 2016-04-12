@@ -5,7 +5,7 @@ import zaCode.Validator as Validator
 import time
 
 
-def performJob():
+def makePrediction():
     # construct Train & Test Data
     xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
 
@@ -18,20 +18,11 @@ def performJob():
     # assessing the performance
     Validator.performValidation(yPred, yTest)
 
-
-def doRandom():
-    data = FileManager.getWholeTrainingData();
-
-    data  = data['colorCode'].unique()
-
-    print data.shape
-
 if __name__ == '__main__':
     startTime = time.time()
 
-    performJob()
+    makePrediction()
 
-    # doRandom()
     # Visualizer.calculateLearningCurve()
 
 

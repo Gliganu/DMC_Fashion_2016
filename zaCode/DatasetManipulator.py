@@ -51,10 +51,6 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # data = performDateEnginnering(data,'orderDate')
     # data = data.drop(['orderDate'],1)
 
-    print "Kept columns {}".format(data.columns)
-
-
-
 
     return data
 
