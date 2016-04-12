@@ -3,10 +3,6 @@ import pandas as pd
 
 
 
-
-
-
-
 def getWholeTrainingData():
 
     inputFileName = '..\\data\\orders_train.txt'

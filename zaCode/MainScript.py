@@ -1,10 +1,9 @@
-import FileManager
-import Visualizer
-import ClassifierTrainer
-import DatasetManipulator
-import Validator
+import zaCode.ClassifierTrainer as ClassifierTrainer
+import zaCode.DatasetManipulator as DatasetManipulator
+import zaCode.Validator as Validator
 
 import time
+
 
 def performJob():
     # construct Train & Test Data
@@ -28,7 +27,6 @@ def doRandom():
     print data.shape
 
 if __name__ == '__main__':
-
     startTime = time.time()
 
     performJob()

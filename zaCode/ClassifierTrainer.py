@@ -78,11 +78,11 @@ def trainUsingGridSearch(classifier, paramGrid, xTrain, yTrain):
 
 def trainClassifier(xTrain,yTrain):
 
-    print "Training classifier..."
+    print("Training classifier...")
 
     # classifier = trainLogisticRegression(xTrain, yTrain)
     # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
-    # classifier = trainRandomForestClassifier(xTrain, yTrain)
+    classifier = trainRandomForestClassifier(xTrain, yTrain)
     classifier = trainNB(xTrain, yTrain)
 
     return classifier

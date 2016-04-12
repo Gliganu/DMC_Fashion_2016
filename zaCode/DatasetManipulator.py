@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-import FileManager
+import  zaCode.FileManager as FileManager
 from sklearn.cross_validation import train_test_split
 
 
@@ -36,7 +36,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
 
-
+    print("Kept columns {}".format(keptColumns))
 
     data = data[keptColumns]
 
