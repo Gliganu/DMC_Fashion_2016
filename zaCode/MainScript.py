@@ -21,17 +21,17 @@ def makePrediction():
 
 
 def play():
-    data = FileManager.get1000kTrainingData()
+    data = FileManager.get10kTrainingData()
 
-
+    DatasetManipulator.constructPercentageReturnColumn(data)
 
 
 if __name__ == '__main__':
     startTime = time.time()
 
-    makePrediction()
+    # makePrediction()
 
-    # play()
+    play()
     # Visualizer.calculateLearningCurve()
 
 

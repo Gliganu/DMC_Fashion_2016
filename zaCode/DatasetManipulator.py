@@ -34,6 +34,11 @@ def performSizeCodeEngineering(data):
     return data
 
 
+def constructPercentageReturnColumn(data):
+    
+    pass
+
+
 def addNewFeatures(data):
 
     #see whether the product was overpriced. price > recommended
@@ -42,6 +47,7 @@ def addNewFeatures(data):
     #see how much the data was discounted ( if price == 0, divide by 1 )
     data['discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
 
+    # data['percentageReturned'] = constructPercentageReturnColumn(data);
     return data
 
 def getFeatureEngineeredData(data,predictionColumnId = None):
