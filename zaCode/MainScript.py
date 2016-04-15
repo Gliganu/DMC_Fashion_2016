@@ -22,7 +22,9 @@ def performJob():
 
 if __name__ == '__main__':
 
-    startTime = time.time()
-    performJob()
-    endTime = time.time()
-    print("Total run time:{}".format(endTime - startTime))
+    # startTime = time.time()
+    # performJob()
+    # endTime = time.time()
+    # print("Total run time:{}".format(endTime - startTime))
+    data = FileManager.getWholeTrainingData()
+    DatasetManipulator.normalizeSize(data)
