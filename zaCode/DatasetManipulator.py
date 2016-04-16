@@ -52,6 +52,23 @@ def constructPercentageReturnColumn(data):
 
     return data
 
+def constructItemPercentageReturnColumn(data):
+
+
+    dataByCustomer = data[['quantity', 'returnQuantity']].groupby(data['articleID'])
+
+    dataSummedByCustomer = dataByCustomer.apply(sum)
+    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity']
+    dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
+
+    idToPercDict = dataSummedByCustomer.to_dict().get('itemPercentageReturned')
+
+    data['itemPercentageReturned'] = data['articleID'].apply(lambda custId: idToPercDict[custId])
+
+    data = data.drop(['articleID'], 1)
+
+    return data
+
 def addNewFeatures(data):
 
     #see whether the product was overpriced. price > recommended
@@ -60,7 +77,8 @@ def addNewFeatures(data):
     #see how much the data was discounted ( if price == 0, divide by 1 )
     data['discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
 
-    data =constructPercentageReturnColumn(data)
+    data = constructPercentageReturnColumn(data)
+    data = constructItemPercentageReturnColumn(data)
     return data
 
 
@@ -110,7 +128,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID' ]
+    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -146,7 +164,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
 def getTrainAndTestData():
 
     print("Reading CSV...")
-    data = FileManager.get10kTrainingData()
+    data = FileManager.get1000kTrainingData()
 
     predictionColumnId = 'returnQuantity'
 

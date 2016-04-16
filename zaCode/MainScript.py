@@ -30,11 +30,11 @@ def play():
 if __name__ == '__main__':
     startTime = time.time()
 
-    # makePrediction()
+    makePrediction()
 
     # play()
     # Visualizer.calculateLearningCurve()
-    Visualizer.calculateRocCurve()
+    # Visualizer.calculateRocCurve()
 
 
     endTime = time.time()
