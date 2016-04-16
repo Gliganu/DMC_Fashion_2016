@@ -2,6 +2,7 @@ import zaCode.ClassifierTrainer as ClassifierTrainer
 import zaCode.DatasetManipulator as DatasetManipulator
 import zaCode.Validator as Validator
 import zaCode.FileManager as FileManager
+import zaCode.Visualizer as Visualizer
 
 import time
 import numpy as np
@@ -29,10 +30,11 @@ def play():
 if __name__ == '__main__':
     startTime = time.time()
 
-    makePrediction()
+    # makePrediction()
 
     # play()
     # Visualizer.calculateLearningCurve()
+    Visualizer.calculateRocCurve()
 
 
     endTime = time.time()

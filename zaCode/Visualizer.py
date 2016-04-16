@@ -9,7 +9,7 @@ import zaCode.ClassifierTrainer as ClassifierTrainer
 from sklearn import cross_validation
 from sklearn.learning_curve import learning_curve
 from sklearn.learning_curve import validation_curve
-
+from sklearn.metrics import roc_curve, auc
 
 #
 #
@@ -47,6 +47,31 @@ from sklearn.learning_curve import validation_curve
 #
 #
 #
+
+def calculateRocCurve():
+    # construct Train & Test Data
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+
+    # training the classifier
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+
+    # predicting
+    yPred = classifier.predict(xTest)
+
+
+    false_positive_rate, true_positive_rate, thresholds = roc_curve(yTest, yPred)
+    roc_auc = auc(false_positive_rate, true_positive_rate)
+
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(false_positive_rate, true_positive_rate, 'b',
+             label='AUC = %0.2f' % roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0.0, 1])
+    plt.ylim([0.0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
+    plt.show()
 
 def calculateLearningCurve():
     # classifier = ClassifierTrainer.constructGradientBoostingClassifier()

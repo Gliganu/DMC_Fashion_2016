@@ -74,9 +74,19 @@ def performColorCodeEngineering(data):
 
 def handleMissingValues(data):
 
-    #dropping the rows with NA values
     data = data.dropna()
 
+    # ORRRR
+    #
+    # productGroupImputer = Imputer(missing_values='NaN', strategy='median')
+    # data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
+    #
+    # rrpImputer = Imputer(missing_values='NaN', strategy='mean')
+    # data['rrp'] = rrpImputer.fit_transform(data['rrp'])
+    #
+    # #todo for the voucherID column, 6 values missing, decide the strategy for those. in mean time, drop them
+    # data = data.dropna()
+    #
 
 
     return data
@@ -136,7 +146,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
 def getTrainAndTestData():
 
     print("Reading CSV...")
-    data = FileManager.get1000kTrainingData()
+    data = FileManager.get10kTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
