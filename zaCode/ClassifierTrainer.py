@@ -23,18 +23,17 @@ def trainRandomForestClassifier(xTrain, yTrain):
     # 10000/3000 =>  {'n_estimators': 90 'max_features': 0.8, 'max_depth': 9}
     # classifier = RandomForestClassifier(n_estimators=90,max_features=0.8, max_depth=9, n_jobs=-1, verbose=1)
 
-    paramGrid = {
-        "n_estimators":[80,90,100],
-        "max_features":[0.7,0.8,0.9]
-    }
+    # paramGrid = {
+    #     "n_estimators":[80,90,100],
+    #     "max_features":[0.7,0.8,0.9]
+    # }
 
 
     #Best  choice is: {'max_features': 0.8, 'n_estimators': 100}
-    classifier = RandomForestClassifier(n_jobs=-1, verbose=1)
+    classifier = RandomForestClassifier(n_jobs=-1, verbose=1, max_features=0.8, n_estimators=100)
 
-    # classifier.fit(xTrain, yTrain)
+    classifier.fit(xTrain, yTrain)
 
-    classifier = trainUsingGridSearch(classifier,paramGrid,xTrain,yTrain)
 
     return classifier
 
@@ -78,11 +77,11 @@ def trainUsingGridSearch(classifier, paramGrid, xTrain, yTrain):
 
 def trainClassifier(xTrain,yTrain):
 
-    print "Training classifier..."
+    print("Training classifier...")
 
     # classifier = trainLogisticRegression(xTrain, yTrain)
-    # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
+    classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
-    classifier = trainNB(xTrain, yTrain)
+    # classifier = trainNB(xTrain, yTrain)
 
     return classifier

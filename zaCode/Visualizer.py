@@ -1,52 +1,77 @@
-import FileManager
+import zaCode.FileManager as FileManager
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-import seaborn as sns
-
-import DatasetManipulator
-import ClassifierTrainer
+import zaCode.DatasetManipulator as DatasetManipulator
+import zaCode.ClassifierTrainer as ClassifierTrainer
 
 from sklearn import cross_validation
 from sklearn.learning_curve import learning_curve
 from sklearn.learning_curve import validation_curve
+from sklearn.metrics import roc_curve, auc
+
+#
+#
+# def plotReturnQuantityHist():
+#
+#     data = FileManager.getWholeTrainingData()
+#
+#     sns.distplot(data['returnQuantity'],kde=False)
+#
+#     plt.title("ReturnQuantity Histogram")
+#     plt.show()
+#
+#
+# def plotScatterPlots():
+#
+#     data = FileManager.getWholeTrainingData()
+#
+#     sns.jointplot(data['returnQuantity'],data['price'])
+#
+#     plt.title("ReturnQuantity x Price Scatterplot")
+#     plt.show()
+#
+#
+# def plotPairPlot():
+#
+#     data = FileManager.getWholeTrainingData()
+#
+#     # data = data[['colorCode','sizeCode','quantity','price','rrp','voucherAmount','returnQuantity']]
+#     data = data[['colorCode','returnQuantity']]
+#
+#     sns.pairplot(data)
+#
+#     plt.title("Pairwise comparison of features")
+#     plt.show()
+#
+#
+#
+
+def calculateRocCurve():
+    # construct Train & Test Data
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+
+    # training the classifier
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+
+    # predicting
+    yPred = classifier.predict(xTest)
 
 
+    false_positive_rate, true_positive_rate, thresholds = roc_curve(yTest, yPred)
+    roc_auc = auc(false_positive_rate, true_positive_rate)
 
-def plotReturnQuantityHist():
-
-    data = FileManager.getWholeTrainingData()
-
-    sns.distplot(data['returnQuantity'],kde=False)
-
-    plt.title("ReturnQuantity Histogram")
+    plt.title('Receiver Operating Characteristic')
+    plt.plot(false_positive_rate, true_positive_rate, 'b',
+             label='AUC = %0.2f' % roc_auc)
+    plt.legend(loc='lower right')
+    plt.plot([0, 1], [0, 1], 'r--')
+    plt.xlim([0.0, 1])
+    plt.ylim([0.0, 1])
+    plt.ylabel('True Positive Rate')
+    plt.xlabel('False Positive Rate')
     plt.show()
-
-
-def plotScatterPlots():
-
-    data = FileManager.getWholeTrainingData()
-
-    sns.jointplot(data['returnQuantity'],data['price'])
-
-    plt.title("ReturnQuantity x Price Scatterplot")
-    plt.show()
-
-
-def plotPairPlot():
-
-    data = FileManager.getWholeTrainingData()
-
-    # data = data[['colorCode','sizeCode','quantity','price','rrp','voucherAmount','returnQuantity']]
-    data = data[['colorCode','returnQuantity']]
-
-    sns.pairplot(data)
-
-    plt.title("Pairwise comparison of features")
-    plt.show()
-
-
 
 def calculateLearningCurve():
     # classifier = ClassifierTrainer.constructGradientBoostingClassifier()

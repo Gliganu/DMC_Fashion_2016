@@ -1,20 +1,117 @@
 import pandas as pd
 import numpy as np
-import FileManager
+import  zaCode.FileManager as FileManager
 from sklearn.cross_validation import train_test_split
+import math as math
+from sklearn.preprocessing import Imputer
 
 
-
-def performDateEnginnering(rawData, dateColumn):
+def performDateEngineering(rawData, dateColumn):
 
     rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
     rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
 
+    rawData = rawData.drop([dateColumn], 1)
+
     return rawData
 
 
+def performOHEOnColumn(data,columnName):
+
+    #adding all the extra columns
+    data = pd.concat([data, pd.get_dummies(data[columnName], prefix=columnName)], axis=1)
+
+    #dropping the "source" column
+    data = data.drop([columnName], 1)
+
+    return data
+
+
+def performSizeCodeEngineering(data):
+
+    #drop everything that is not digit. About 200k examples ( maybe not the best way )
+    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
+
+    return data
+
+
+def constructPercentageReturnColumn(data):
+
+
+    dataByCustomer = data[['quantity', 'returnQuantity']].groupby(data['customerID'])
+
+    dataSummedByCustomer = dataByCustomer.apply(sum)
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity']
+    dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
+
+    idToPercDict = dataSummedByCustomer.to_dict().get('percentageReturned')
+
+    data['percentageReturned'] = data['customerID'].apply(lambda custId: idToPercDict[custId])
+
+    data = data.drop(['customerID'], 1)
+
+    return data
+
+def constructItemPercentageReturnColumn(data):
+
+
+    dataByCustomer = data[['quantity', 'returnQuantity']].groupby(data['articleID'])
+
+    dataSummedByCustomer = dataByCustomer.apply(sum)
+    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity']
+    dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
+
+    idToPercDict = dataSummedByCustomer.to_dict().get('itemPercentageReturned')
+
+    data['itemPercentageReturned'] = data['articleID'].apply(lambda custId: idToPercDict[custId])
+
+    data = data.drop(['articleID'], 1)
+
+    return data
+
+def addNewFeatures(data):
+
+    #see whether the product was overpriced. price > recommended
+    data['overpriced'] = data['price'] > data['rrp']
+
+    #see how much the data was discounted ( if price == 0, divide by 1 )
+    data['discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
+
+    data = constructPercentageReturnColumn(data)
+    data = constructItemPercentageReturnColumn(data)
+    return data
+
+
+def performColorCodeEngineering(data):
+
+    #get the thousands digit. in the color RAL system, that represents the "Base" color
+    data['colorCode'] = data['colorCode'].apply(lambda code: code/1000)
+
+    return data
+
+
+def handleMissingValues(data):
+
+    data = data.dropna()
+
+    # ORRRR
+    #
+    # productGroupImputer = Imputer(missing_values='NaN', strategy='median')
+    # data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
+    #
+    # rrpImputer = Imputer(missing_values='NaN', strategy='mean')
+    # data['rrp'] = rrpImputer.fit_transform(data['rrp'])
+    #
+    # #todo for the voucherID column, 6 values missing, decide the strategy for those. in mean time, drop them
+    # data = data.dropna()
+    #
+
+
+    return data
+
 def getFeatureEngineeredData(data,predictionColumnId = None):
 
+    print ("Performing feature engineering...")
     # orderID;
     # orderDate;
     # articleID;
@@ -31,37 +128,43 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID' ]
+    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
 
-
-
     data = data[keptColumns]
 
+    # construct additional features as a mixture of various ones
+    data = addNewFeatures(data)
+
     # drop NAs
-    data = data.dropna()
-
-    #restrict prediction to 0/1 for now
-    filter = (data['returnQuantity'] == 0) | (data['returnQuantity'] == 1)
-    data = data[filter]
+    data = handleMissingValues(data)
 
 
-    # data = performDateEnginnering(data,'orderDate')
-    # data = data.drop(['orderDate'],1)
-
-    print "Kept columns {}".format(data.columns)
+    #restrict prediction to 0/1 for now. Map everything greater than 1 to 1
+    data['returnQuantity'] = data['returnQuantity'].apply(lambda retQuant: min(retQuant,1))
 
 
+    data = performOHEOnColumn(data, 'deviceID')
 
+    data = performOHEOnColumn(data, 'paymentMethod')
+
+    data = performSizeCodeEngineering(data)
+
+    data = performColorCodeEngineering(data)
+
+    # data = performDateEngineering(data, 'orderDate')
+
+    print("\nKept columns {}".format(data.columns))
 
     return data
 
 
 def getTrainAndTestData():
 
-    data = FileManager.getWholeTrainingData()
+    print("Reading CSV...")
+    data = FileManager.get1000kTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
