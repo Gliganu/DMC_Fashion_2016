@@ -1,11 +1,65 @@
 import pandas as pd
 import numpy as np
-import  zaCode.FileManager as FileManager
+import math
+import sys
+
+from collections import defaultdict
+
 from sklearn.cross_validation import train_test_split
-import math as math
 from sklearn.preprocessing import Imputer
 
+import  zaCode.FileManager as FileManager
 
+
+def mapFeaturesToCondProbs(rawData, featureMask = None):
+    """
+        replaces all features in the dataset with the 
+        conditional probability of the return qty being 
+        equal to or greater than one i.e. maps:
+        feature -> P(returnQuantity > 0 | Feature = feature).
+        
+        param featureMask : dict of colName -> bool that 
+                            controls which feature is mapped
+                            default = None, will map all
+        return modified data and global mapping used in tuple
+    """
+    if featureMask == None:
+        featureMask = defaultdict(lambda: True, returnQuantity=False)
+    
+    rowNum = len(rawData)
+    # will also return a global map so we can do the inverse mappings
+    globalMap = {}
+    
+    for colName, series in rawData.iteritems():
+
+        if featureMask[colName]:
+            print('processing column ' + colName + '...')
+            colMap = {}
+            for uniqueVal in series.unique():
+                allValsCnt = series[series == uniqueVal].count();
+                valsFavorableSeries = (rawData[rawData['returnQuantity'] > 0])[colName]
+                valsFavorableCnt = valsFavorableSeries[valsFavorableSeries == uniqueVal].count()
+                
+                colMap[uniqueVal] = valsFavorableCnt / allValsCnt
+                
+            globalMap[colName] = colMap
+            
+            # actually apply transform
+            series = series.apply(lambda x: colMap[x])
+            rawData[colName] = series
+            
+    return rawData, globalMap       
+    
+def clusterRetQtyGTOne(rawData):
+    """
+        replaces all return qts greater than one
+        with one, turning problem into binary classification.
+    """
+    rawData['returnQuantity'] = rawData['returnQuantity'].apply(lambda qty: 0 if qty < 1 else 1)
+    
+    return rawData
+
+        
 def performDateEngineering(rawData, dateColumn):
 
     rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
