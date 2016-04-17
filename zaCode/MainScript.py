@@ -1,12 +1,13 @@
-import FileManager
-import Visualizer
-import ClassifierTrainer
-import DatasetManipulator
-import Validator
+import zaCode.ClassifierTrainer as ClassifierTrainer
+import zaCode.DatasetManipulator as DatasetManipulator
+import zaCode.Validator as Validator
+import zaCode.FileManager as FileManager
+import zaCode.Visualizer as Visualizer
 
 import time
+import numpy as np
 
-def performJob():
+def makePrediction():
     # construct Train & Test Data
     xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
 
@@ -20,11 +21,21 @@ def performJob():
     Validator.performValidation(yPred, yTest)
 
 
-if __name__ == '__main__':
+def play():
+    data = FileManager.get10kTrainingData()
 
-    # startTime = time.time()
-    # performJob()
-    # endTime = time.time()
-    # print("Total run time:{}".format(endTime - startTime))
-    data = FileManager.getWholeTrainingData()
-    DatasetManipulator.normalizeSize(data)
+    # DatasetManipulator.constructPercentageReturnColumn(data)
+#
+
+if __name__ == '__main__':
+    startTime = time.time()
+
+    makePrediction()
+
+    # play()
+    # Visualizer.calculateLearningCurve()
+    # Visualizer.calculateRocCurve()
+
+
+    endTime = time.time()
+    print("Total run time:{}".format(endTime - startTime))
