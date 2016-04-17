@@ -5,6 +5,49 @@ from sklearn.cross_validation import train_test_split
 import math as math
 from sklearn.preprocessing import Imputer
 
+def normalizeSize(data):
+    data['sizeCode'][data['sizeCode'] == 'XS'] = 0
+    data['sizeCode'][data['sizeCode'] == 'S'] = 1
+    data['sizeCode'][data['sizeCode'] == 'M'] = 2
+    data['sizeCode'][data['sizeCode'] == 'L'] = 3
+    data['sizeCode'][data['sizeCode'] == 'XL'] = 4
+    # set A and I on 2 for now
+    data['sizeCode'][data['sizeCode'] == 'I'] = 2
+    data['sizeCode'][data['sizeCode'] == 'A'] = 2
+    data['sizeCode'] = pd.to_numeric(data['sizeCode'])
+    # normalize XS-XL
+    data['sizeCode'][(data['sizeCode'] <= 4) & (data['sizeCode'] >= 0)] = \
+    data['sizeCode'][(data['sizeCode'] <= 4) & (data['sizeCode'] >= 0)].apply(lambda x: x / 4.0)
+    # normalize 32-44
+    data['sizeCode'][(data['sizeCode'] <= 44) & (data['sizeCode'] >= 32)] = \
+    data['sizeCode'][(data['sizeCode'] <= 44) & (data['sizeCode'] >= 32)].apply(lambda x:(x - 32.0) / (44.0 - 32.0))
+    # normalize 75-100
+    data['sizeCode'][(data['sizeCode'] <= 100) & (data['sizeCode'] >= 75)] = \
+    data['sizeCode'][(data['sizeCode'] <= 100) & (data['sizeCode'] >= 75)].apply(lambda x:(x - 75.0) / (100.0 - 75.0))
+    # set I and A to mean
+    data['sizeCode'][data['sizeCode'] == 2] = data['sizeCode'].mean()
+
+def performSizeCodeEngineering(data):
+
+    #drop everything that is not digit. About 200k examples ( maybe not the best way )
+    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
+
+    return data
+
+def constructBasketColumns(data):
+    grouped_by_orderID = data['quantity'].groupby(data['orderID'])
+
+    aggregated = pd.DataFrame()
+    aggregated[['basketSize', 'basketTotalQuantity']]  = grouped_by_orderID.agg([np.size, np.sum])
+
+    dict_basket_total_quantity = aggregated.to_dict().get('basketTotalQuantity')
+    dict_basket_size = aggregated.to_dict().get('basketSize')
+
+    data['basketSize'] = data['orderID'].apply(lambda id: dict_basket_size[id])
+    data['basketQuantity'] = data['orderID'].apply(lambda id: dict_basket_total_quantity[id])
+
+    data = data.drop(['orderID'], 1)
+    return data
 
 def performDateEngineering(rawData, dateColumn):
 
@@ -30,7 +73,7 @@ def performOHEOnColumn(data,columnName):
 def performSizeCodeEngineering(data):
 
     #drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
+    data = data[data['sizeCode'].apply(lambda x: x.isdigit())]
 
     return data
 
@@ -79,6 +122,7 @@ def addNewFeatures(data):
 
     data = constructPercentageReturnColumn(data)
     data = constructItemPercentageReturnColumn(data)
+    data = constructBasketColumns(data)
     return data
 
 
@@ -128,7 +172,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     # paymentMethod;
     # returnQuantity
 
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
+    keptColumns = ['orderID', 'colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -164,7 +208,7 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
 def getTrainAndTestData():
 
     print("Reading CSV...")
-    data = FileManager.get1000kTrainingData()
+    data = FileManager.getWholeTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
