@@ -1,9 +1,64 @@
 import pandas as pd
 import numpy as np
-import  zaCode.FileManager as FileManager
+import math
+import sys
+
+from collections import defaultdict
+
 from sklearn.cross_validation import train_test_split
-import math as math
 from sklearn.preprocessing import Imputer
+
+import  zaCode.FileManager as FileManager
+
+
+def mapFeaturesToCondProbs(rawData, featureMask = None):
+    """
+        replaces all features in the dataset with the
+        conditional probability of the return qty being
+        equal to or greater than one i.e. maps:
+        feature -> P(returnQuantity > 0 | Feature = feature).
+
+        param featureMask : dict of colName -> bool that
+                            controls which feature is mapped
+                            default = None, will map all
+        return modified data and global mapping used in tuple
+    """
+    if featureMask == None:
+        featureMask = defaultdict(lambda: True, returnQuantity=False)
+
+    rowNum = len(rawData)
+    # will also return a global map so we can do the inverse mappings
+    globalMap = {}
+
+    for colName, series in rawData.iteritems():
+
+        if featureMask[colName]:
+            print('processing column ' + colName + '...')
+            colMap = {}
+            for uniqueVal in series.unique():
+                allValsCnt = series[series == uniqueVal].count();
+                valsFavorableSeries = (rawData[rawData['returnQuantity'] > 0])[colName]
+                valsFavorableCnt = valsFavorableSeries[valsFavorableSeries == uniqueVal].count()
+
+                colMap[uniqueVal] = valsFavorableCnt / allValsCnt
+
+            globalMap[colName] = colMap
+
+            # actually apply transform
+            series = series.apply(lambda x: colMap[x])
+            rawData[colName] = series
+
+    return rawData, globalMap
+
+def clusterRetQtyGTOne(rawData):
+    """
+        replaces all return qts greater than one
+        with one, turning problem into binary classification.
+    """
+    rawData['returnQuantity'] = rawData['returnQuantity'].apply(lambda qty: 0 if qty < 1 else 1)
+
+    return rawData
+
 
 def normalizeSize(data):
     data['sizeCode'][data['sizeCode'] == 'XS'] = 0
@@ -73,15 +128,17 @@ def performOHEOnColumn(data,columnName):
 def performSizeCodeEngineering(data):
 
     #drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].apply(lambda x: x.isdigit())]
+    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
 
-    return data
+    # avoind chain indexing warning
+    return data.copy()
 
 
 def constructPercentageReturnColumn(data):
+    # avoid chain indexing warning
+    dataCopy = data.copy()
 
-
-    dataByCustomer = data[['quantity', 'returnQuantity']].groupby(data['customerID'])
+    dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
     dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity']
@@ -89,16 +146,17 @@ def constructPercentageReturnColumn(data):
 
     idToPercDict = dataSummedByCustomer.to_dict().get('percentageReturned')
 
-    data['percentageReturned'] = data['customerID'].apply(lambda custId: idToPercDict[custId])
+    dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
 
-    data = data.drop(['customerID'], 1)
+    dataCopy = dataCopy.drop(['customerID'], 1)
 
-    return data
+    return dataCopy
 
 def constructItemPercentageReturnColumn(data):
+    # avoid chain indexing warning
+    dataCopy = data.copy()
 
-
-    dataByCustomer = data[['quantity', 'returnQuantity']].groupby(data['articleID'])
+    dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['articleID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
     dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity']
@@ -106,19 +164,19 @@ def constructItemPercentageReturnColumn(data):
 
     idToPercDict = dataSummedByCustomer.to_dict().get('itemPercentageReturned')
 
-    data['itemPercentageReturned'] = data['articleID'].apply(lambda custId: idToPercDict[custId])
+    dataCopy.loc[:, 'itemPercentageReturned'] = data['articleID'].apply(lambda custId: idToPercDict[custId])
 
-    data = data.drop(['articleID'], 1)
+    dataCopy = dataCopy.drop(['articleID'], 1)
 
-    return data
+    return dataCopy
 
 def addNewFeatures(data):
 
     #see whether the product was overpriced. price > recommended
-    data['overpriced'] = data['price'] > data['rrp']
+    data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
     #see how much the data was discounted ( if price == 0, divide by 1 )
-    data['discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
+    data.loc[:, 'discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr,1))
 
     data = constructPercentageReturnColumn(data)
     data = constructItemPercentageReturnColumn(data)
@@ -153,7 +211,7 @@ def handleMissingValues(data):
 
     return data
 
-def getFeatureEngineeredData(data,predictionColumnId = None):
+def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True, performSizeCodeEng = True):
 
     print ("Performing feature engineering...")
     # orderID;
@@ -177,7 +235,8 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
 
-    data = data[keptColumns]
+    # avoid chain indexing warning
+    data = data[keptColumns].copy()
 
     # construct additional features as a mixture of various ones
     data = addNewFeatures(data)
@@ -189,12 +248,12 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     #restrict prediction to 0/1 for now. Map everything greater than 1 to 1
     data['returnQuantity'] = data['returnQuantity'].apply(lambda retQuant: min(retQuant,1))
 
+    if performOHE:
+        data = performOHEOnColumn(data, 'deviceID')
+        data = performOHEOnColumn(data, 'paymentMethod')
 
-    data = performOHEOnColumn(data, 'deviceID')
-
-    data = performOHEOnColumn(data, 'paymentMethod')
-
-    data = performSizeCodeEngineering(data)
+    if performSizeCodeEng:
+        data = performSizeCodeEngineering(data)
 
     data = performColorCodeEngineering(data)
 
@@ -205,14 +264,19 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     return data
 
 
-def getTrainAndTestData():
-
-    print("Reading CSV...")
-    data = FileManager.getWholeTrainingData()
+def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = True):
+    """
+        returns train and test data based
+        on input data frame. if None is passed,
+        csv is automatically loaded.
+    """
+    if data is None:
+        print("No data passed, reading CSV...")
+        data = FileManager.getTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
-    data = getFeatureEngineeredData(data,predictionColumnId)
+    data = getFeatureEngineeredData(data, predictionColumnId, performOHE, performSizeCodeEng)
 
     trainData, testData = train_test_split(data, test_size=0.25)
 
