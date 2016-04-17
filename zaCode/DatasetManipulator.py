@@ -215,10 +215,15 @@ def getFeatureEngineeredData(data,predictionColumnId = None):
     return data
 
 
-def getTrainAndTestData():
-
-    print("Reading CSV...")
-    data = FileManager.get1000kTrainingData()
+def getTrainAndTestData(data = None):
+    """
+        returns train and test data based
+        on input data frame. if None is passed,
+        csv is automatically loaded.
+    """
+    if data == None:
+        print("No data passed, reading CSV...")
+        data = FileManager.getTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
