@@ -44,8 +44,8 @@ def trainGradientBoostingClassifier(xTrain, yTrain):
     # n_estimators = 120, learning_rate = 0.07
     # max_features= 0.5, max_depth= 6
     # subsample = 0.9
-    # classifier = GradientBoostingClassifier(n_estimators=120,max_depth=6,min_samples_leaf=1,learning_rate=0.07,max_features=0.5, verbose=1)
-    classifier = GradientBoostingClassifier(verbose=1)
+    classifier = GradientBoostingClassifier(n_estimators=120,max_depth=6,min_samples_leaf=1,learning_rate=0.07,max_features=0.5, verbose=1)
+    # classifier = GradientBoostingClassifier(verbose=1)
 
     classifier.fit(xTrain, yTrain)
 

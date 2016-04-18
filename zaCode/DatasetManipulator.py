@@ -7,7 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 
 from sklearn.cross_validation import train_test_split
-from sklearn.preprocessing import Imputer
+from sklearn.preprocessing import Imputer,StandardScaler,PolynomialFeatures
 
 import  zaCode.FileManager as FileManager
 
@@ -27,9 +27,16 @@ def mapFeaturesToCondProbs(rawData, featureMask = None):
     if featureMask == None:
         featureMask = defaultdict(lambda: True, returnQuantity=False)
 
+    # prevent mutation of input data
+    rawData = rawData.copy()
+    rawData.dropna()
+
     rowNum = len(rawData)
     # will also return a global map so we can do the inverse mappings
     globalMap = {}
+
+    # cache data frame full of just favorable occurences
+    valsFavorableDf = rawData[rawData['returnQuantity'] > 0].copy()
 
     for colName, series in rawData.iteritems():
 
@@ -140,6 +147,9 @@ def performSizeCodeEngineering(data):
 
 
 def constructPercentageReturnColumn(data):
+
+    print("Constructing PercentageReturn feature....")
+
     # avoid chain indexing warning
     dataCopy = data.copy()
 
@@ -158,6 +168,9 @@ def constructPercentageReturnColumn(data):
     return dataCopy
 
 def constructItemPercentageReturnColumn(data):
+
+    print("Constructing ItemPercentageReturn feature....")
+
     # avoid chain indexing warning
     dataCopy = data.copy()
 
@@ -175,6 +188,51 @@ def constructItemPercentageReturnColumn(data):
 
     return dataCopy
 
+
+def constructPolynomialFeatures(data):
+
+    print("Constructing polynomial features....")
+
+    #get only the target columns
+    features = ['quantity', 'price','voucherAmount','basketQuantity','percentageReturned', 'overpriced', 'discountedAmount']
+
+    targetData = data[features].copy()
+
+    #standardize everything
+    dataMatrix = targetData.as_matrix().astype(np.float)
+    scaler = StandardScaler()
+    dataMatrix = scaler.fit_transform(dataMatrix)
+
+    #construct polynomial features
+    polynomialFeatures = PolynomialFeatures(interaction_only=True,include_bias=False)
+    newColumnsMatrix = polynomialFeatures.fit_transform(dataMatrix)
+
+    newColumnsNames = []
+
+    #construct the names of the newly generated features as we only have a matrix of numbers now
+    for entry in polynomialFeatures.powers_:
+        newFeature = []
+        for feat, coef in zip(features, entry):
+            if coef > 0:
+                newFeature.append(feat + '^' + str(coef))
+        if not newFeature:
+            newColumnsNames.append("1")
+        else:
+            newColumnsNames.append(' + '.join(newFeature))
+
+
+    newColumnsDataFrame = pd.DataFrame(newColumnsMatrix,columns=newColumnsNames)
+
+    #drop all the features which are themselves to the power 1  ( as they already exist )
+    newColumnsToBeDeleted = [featureName+"^1" for featureName in features]
+    newColumnsDataFrame = newColumnsDataFrame.drop(newColumnsToBeDeleted, 1)
+
+    data = data.join(newColumnsDataFrame)
+
+    return data
+
+
+
 def addNewFeatures(data):
 
     #see whether the product was overpriced. price > recommended
@@ -186,13 +244,16 @@ def addNewFeatures(data):
     data = constructPercentageReturnColumn(data)
     data = constructItemPercentageReturnColumn(data)
     data = constructBasketColumns(data)
+
+    data = constructPolynomialFeatures(data)
+
     return data
 
 
 def performColorCodeEngineering(data):
 
     #get the thousands digit. in the color RAL system, that represents the "Base" color
-    data['colorCode'] = data['colorCode'].apply(lambda code: code/1000)
+    data['colorCode'] = data['colorCode'].apply(lambda code: int(code)/1000)
 
     return data
 
@@ -216,7 +277,11 @@ def handleMissingValues(data):
 
     return data
 
-def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True, performSizeCodeEng = True):
+def getFeatureEngineeredData(data, predictionColumnId = None,
+                             keptColumns = ['colorCode', 'quantity', 'price',
+                                            'rrp','deviceID','paymentMethod','sizeCode',
+                                            'voucherAmount','customerID','articleID' ],
+                             performOHE = True, performSizeCodeEng = True):
 
     print ("Performing feature engineering...")
     # orderID;
@@ -264,12 +329,16 @@ def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True,
 
     data = performDateEngineering(data, 'orderDate')
 
-    print("\nKept columns {}".format(data.columns))
+    print("\nKept columns ({}) : {} ".format(len(data.columns),data.columns))
 
     return data
 
 
-def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = True):
+def getTrainAndTestData(data = None,
+                        keptColumns = ['orderID', 'colorCode', 'quantity',
+                                       'price', 'rrp','deviceID','paymentMethod',
+                                       'sizeCode','voucherAmount','customerID','articleID' ],
+                        performOHE = True, performSizeCodeEng = True):
     """
         returns train and test data based
         on input data frame. if None is passed,
@@ -281,7 +350,7 @@ def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = Tru
 
     predictionColumnId = 'returnQuantity'
 
-    data = getFeatureEngineeredData(data, predictionColumnId, performOHE, performSizeCodeEng)
+    data = getFeatureEngineeredData(data, predictionColumnId,  keptColumns, performSizeCodeEng, performOHE)
 
     trainData, testData = train_test_split(data, test_size=0.25)
 
