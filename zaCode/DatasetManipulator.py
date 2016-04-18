@@ -26,10 +26,17 @@ def mapFeaturesToCondProbs(rawData, featureMask = None):
     if featureMask == None:
         featureMask = defaultdict(lambda: True, returnQuantity=False)
     
+    # prevent mutation of input data
+    rawData = rawData.copy() 
+    rawData.dropna()
+    
     rowNum = len(rawData)
     # will also return a global map so we can do the inverse mappings
     globalMap = {}
     
+    # cache data frame full of just favorable occurences
+    valsFavorableDf = rawData[rawData['returnQuantity'] > 0].copy()
+                
     for colName, series in rawData.iteritems():
 
         if featureMask[colName]:
@@ -37,7 +44,7 @@ def mapFeaturesToCondProbs(rawData, featureMask = None):
             colMap = {}
             for uniqueVal in series.unique():
                 allValsCnt = series[series == uniqueVal].count();
-                valsFavorableSeries = (rawData[rawData['returnQuantity'] > 0])[colName]
+                valsFavorableSeries = valsFavorableDf[colName]
                 valsFavorableCnt = valsFavorableSeries[valsFavorableSeries == uniqueVal].count()
                 
                 colMap[uniqueVal] = valsFavorableCnt / allValsCnt
@@ -166,7 +173,11 @@ def handleMissingValues(data):
 
     return data
 
-def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True, performSizeCodeEng = True):
+def getFeatureEngineeredData(data, predictionColumnId = None, 
+                             keptColumns = ['colorCode', 'quantity', 'price',
+                                            'rrp','deviceID','paymentMethod','sizeCode',
+                                            'voucherAmount','customerID','articleID' ],
+                             performOHE = True, performSizeCodeEng = True):
 
     print ("Performing feature engineering...")
     # orderID;
@@ -184,8 +195,6 @@ def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True,
     # deviceID;
     # paymentMethod;
     # returnQuantity
-
-    keptColumns = ['colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -212,14 +221,18 @@ def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True,
 
     data = performColorCodeEngineering(data)
 
-    # data = performDateEngineering(data, 'orderDate')
+    data = performDateEngineering(data, 'orderDate')
 
     print("\nKept columns {}".format(data.columns))
 
     return data
 
 
-def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = True):
+def getTrainAndTestData(data = None, 
+                        keptColumns = ['colorCode', 'quantity', 'price',
+                                       'rrp','deviceID','paymentMethod','sizeCode',
+                                       'voucherAmount','customerID','articleID' ],
+                        performOHE = True, performSizeCodeEng = True):
     """
         returns train and test data based
         on input data frame. if None is passed,
@@ -231,7 +244,7 @@ def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = Tru
 
     predictionColumnId = 'returnQuantity'
 
-    data = getFeatureEngineeredData(data, predictionColumnId, performOHE, performSizeCodeEng)
+    data = getFeatureEngineeredData(data, predictionColumnId,  keptColumns, performSizeCodeEng, performOHE)
 
     trainData, testData = train_test_split(data, test_size=0.25)
 
