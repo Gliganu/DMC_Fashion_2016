@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 import sys
+from datetime import datetime
 
 from collections import defaultdict
 
@@ -25,18 +26,18 @@ def mapFeaturesToCondProbs(rawData, featureMask = None):
     """
     if featureMask == None:
         featureMask = defaultdict(lambda: True, returnQuantity=False)
-    
+
     # prevent mutation of input data
-    rawData = rawData.copy() 
+    rawData = rawData.copy()
     rawData.dropna()
-    
+
     rowNum = len(rawData)
     # will also return a global map so we can do the inverse mappings
     globalMap = {}
-    
+
     # cache data frame full of just favorable occurences
     valsFavorableDf = rawData[rawData['returnQuantity'] > 0].copy()
-                
+
     for colName, series in rawData.iteritems():
 
         if featureMask[colName]:
@@ -111,15 +112,19 @@ def constructBasketColumns(data):
     data = data.drop(['orderID'], 1)
     return data
 
+def constructWeekDayColumn(data):
+    dataCopy = data.copy()
+    dataCopy['weekday'] = dataCopy['orderDate'].map(lambda date: 1 if datetime.strptime(date, '%Y-%m-%d').weekday() <= 4 else 0)
+    return dataCopy
+
 def performDateEngineering(rawData, dateColumn):
 
-    rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
-    rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
+    # rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
+    # rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
+    data = constructWeekDayColumn(rawData)
+    data = data.drop([dateColumn], 1)
 
-    rawData = rawData.drop([dateColumn], 1)
-
-    return rawData
-
+    return data
 
 def performOHEOnColumn(data,columnName):
 
@@ -135,9 +140,9 @@ def performOHEOnColumn(data,columnName):
 def performSizeCodeEngineering(data):
 
     #drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
+    data = data[data['sizeCode'].apply(lambda x: x.isdigit())]
 
-    # avoind chain indexing warning
+    # avoid chain indexing warning
     return data.copy()
 
 
@@ -272,7 +277,7 @@ def handleMissingValues(data):
 
     return data
 
-def getFeatureEngineeredData(data, predictionColumnId = None, 
+def getFeatureEngineeredData(data, predictionColumnId = None,
                              keptColumns = ['colorCode', 'quantity', 'price',
                                             'rrp','deviceID','paymentMethod','sizeCode',
                                             'voucherAmount','customerID','articleID' ],
@@ -294,6 +299,8 @@ def getFeatureEngineeredData(data, predictionColumnId = None,
     # deviceID;
     # paymentMethod;
     # returnQuantity
+
+    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp','deviceID','paymentMethod','sizeCode','voucherAmount','customerID','articleID' ]
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -320,15 +327,15 @@ def getFeatureEngineeredData(data, predictionColumnId = None,
 
     data = performColorCodeEngineering(data)
 
-    # data = performDateEngineering(data, 'orderDate')
+    data = performDateEngineering(data, 'orderDate')
 
     print("\nKept columns ({}) : {} ".format(len(data.columns),data.columns))
 
     return data
 
 
-def getTrainAndTestData(data = None, 
-                        keptColumns = ['orderID', 'colorCode', 'quantity', 
+def getTrainAndTestData(data = None,
+                        keptColumns = ['orderID', 'colorCode', 'quantity',
                                        'price', 'rrp','deviceID','paymentMethod',
                                        'sizeCode','voucherAmount','customerID','articleID' ],
                         performOHE = True, performSizeCodeEng = True):
