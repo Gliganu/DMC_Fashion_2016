@@ -182,7 +182,7 @@ def constructPolynomialFeatures(data):
     print("Constructing polynomial features....")
 
     #get only the target columns
-    features = ['quantity', 'price','voucherAmount','basketQuantity','percentageReturned']
+    features = ['quantity', 'price','voucherAmount','basketQuantity','percentageReturned', 'overpriced', 'discountedAmount']
 
     targetData = data[features].copy()
 
@@ -292,12 +292,11 @@ def getFeatureEngineeredData(data, predictionColumnId = None, performOHE = True,
     # avoid chain indexing warning
     data = data[keptColumns].copy()
 
-    # drop NAs
-    data = handleMissingValues(data)
-
     # construct additional features as a mixture of various ones
     data = addNewFeatures(data)
 
+    # drop NAs
+    data = handleMissingValues(data)
 
 
     #restrict prediction to 0/1 for now. Map everything greater than 1 to 1
@@ -327,7 +326,7 @@ def getTrainAndTestData(data = None, performOHE = True, performSizeCodeEng = Tru
     """
     if data is None:
         print("No data passed, reading CSV...")
-        data = FileManager.get10kTrainingData()
+        data = FileManager.getWholeTrainingData()
 
     predictionColumnId = 'returnQuantity'
 
