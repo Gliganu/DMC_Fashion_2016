@@ -48,6 +48,20 @@ from sklearn.metrics import roc_curve, auc
 #
 #
 
+
+def plotFeatureImportance(feature_importance,featureNames):
+
+    # Normalize The Features
+    feature_importance = 100.0 * (feature_importance / feature_importance.max())
+    sorted_idx = np.argsort(feature_importance)
+    pos = np.arange(sorted_idx.shape[0]) + .5
+    plt.figure(figsize=(16, 12))
+    plt.barh(pos, feature_importance[sorted_idx], align='center', color='#7A68A6')
+    plt.yticks(pos, np.asanyarray(featureNames)[sorted_idx])
+    plt.xlabel('Relative Importance')
+    plt.title('Variable Importance')
+    plt.show()
+
 def calculateRocCurve():
     # construct Train & Test Data
     xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
