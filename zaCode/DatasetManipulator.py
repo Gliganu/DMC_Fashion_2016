@@ -282,11 +282,7 @@ def handleMissingValues(data):
     return data
 
 
-def getFeatureEngineeredData(data, predictionColumnId=None,
-                             keptColumns=['colorCode', 'quantity', 'price',
-                                          'rrp', 'deviceID', 'paymentMethod', 'sizeCode',
-                                          'voucherAmount', 'customerID', 'articleID'],
-                             performOHE=True, performSizeCodeEng=True):
+def getFeatureEngineeredData(data, keptColumns, predictionColumnId=None,  performOHE=True, performSizeCodeEng=True):
     print ("Performing feature engineering...")
     # orderID;
     # orderDate;
@@ -303,9 +299,6 @@ def getFeatureEngineeredData(data, predictionColumnId=None,
     # deviceID;
     # paymentMethod;
     # returnQuantity
-
-    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
-                   'sizeCode', 'voucherAmount', 'customerID', 'articleID']
 
     if predictionColumnId:
         keptColumns.append(predictionColumnId)
@@ -338,11 +331,7 @@ def getFeatureEngineeredData(data, predictionColumnId=None,
     return data
 
 
-def getTrainAndTestData(data=None,
-                        keptColumns=['orderID', 'colorCode', 'quantity',
-                                     'price', 'rrp', 'deviceID', 'paymentMethod',
-                                     'sizeCode', 'voucherAmount', 'customerID', 'articleID'],
-                        performOHE=True, performSizeCodeEng=True):
+def getTrainAndTestData(keptColumns, data=None, performOHE=True, performSizeCodeEng=True):
     """
         returns train and test data based
         on input data frame. if None is passed,

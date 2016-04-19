@@ -8,8 +8,13 @@ import time
 import numpy as np
 
 def makePrediction():
+
+    keptColumns = ['orderID', 'colorCode', 'quantity',
+                                     'price', 'rrp', 'deviceID', 'paymentMethod',
+                                     'sizeCode', 'voucherAmount', 'customerID', 'articleID']
+
     # construct Train & Test Data
-    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData(keptColumns)
 
     # training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
