@@ -2,15 +2,94 @@ import pandas as pd
 import numpy as np
 import math
 import sys
+
 from datetime import datetime
 from collections import defaultdict
+from copy import copy
+
 from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize
-import zaCode.FileManager as FileManager
 from sklearn.feature_selection import SelectKBest,f_regression
 
+import zaCode.FileManager as FileManager
 
-def mapFeaturesToCondProbs(rawData, featureMask=None):
+
+class DSetTransform:
+    """ Class Transforms a  by dropping or replacing features
+        Currently implements OHE, Conditional Probability and Dropping Cols.
+        TODO Test.
+    """
+    
+    def __init__(self, 
+                 feats_kept = [],
+                 feats_ohe = [],
+                 feats_condprob = [],
+                 target = 'returnQuantity'):
+        
+        self.feats_kept = feats_kept
+        self.feats_ohe = feats_ohe
+        self.feats_condprob = feats_condprob
+        self.target = target
+        
+    def transformCondProb(self, data):
+        """
+            returns data with columns transformed according
+            to feats_condprob set (if f in feats_condprob,
+            column named f will be replaced with conditional
+            probability P(target > 0 | f).
+        """
+        
+        #prevent mutation of input data (dropOtherFeats also copies data frame)
+        data_filtered = self.dropOtherFeats(data, self.feats_condprob)
+
+        mask = defaultdict(lambda: False)
+        mask.update({ f: True for f in self.feats_condprob })
+        data_cprob, probMap = mapFeaturesToCondProbs(data_filtered, mask, self.target)
+        
+        return data_cprob
+    
+    def transformOHE(self, data):
+        """
+            returns data with binary columns for each categorical
+            feature named in feats_ohe, and initial feature dropped
+        """
+        
+        #prevent mutation of input data (dropOtherFeats also copies data frame)
+        data = self.dropOtherFeats(data, self.feats_ohe)
+        for f in self.feats_ohe:
+            data = performOHEOnColumn(data, f)
+        
+        return data
+    
+    def dropOtherFeats(self, data, feats_kept = None):
+        """
+            returns new data frame containing only target varible
+            and features contained in feats_kept
+        """
+        if feats_kept is None:
+            feats_kept = self.feats_kept
+            
+        col_index = copy(feats_kept)
+        col_index.append(self.target)
+        
+        return data[col_index].copy()
+    
+    def transform(self, data, drop = False):
+        """
+            transforms data frame with all operations, by default does not drop cols
+        """
+        # transform and drop target (we don't want duplicate cols)
+        data_cprob = self.transformCondProb(data).drop([self.target], 1)
+        data_ohe = self.transformOHE(data).drop([self.target], 1)
+
+        data_filtered = self.dropOtherFeats(data) if drop else data.copy()
+
+        return pd.concat([data_filtered, data_cprob, data_ohe], 1)
+        
+        
+    
+    
+def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
     """
         replaces all features in the dataset with the
         conditional probability of the return qty being
@@ -20,6 +99,8 @@ def mapFeaturesToCondProbs(rawData, featureMask=None):
         param featureMask : dict of colName -> bool that
                             controls which feature is mapped
                             default = None, will map all
+        param target : target variable to predict 
+                       (in our case, returnQuantity)
         return modified data and global mapping used in tuple
     """
     if featureMask == None:
@@ -34,7 +115,7 @@ def mapFeaturesToCondProbs(rawData, featureMask=None):
     globalMap = {}
 
     # cache data frame full of just favorable occurences
-    valsFavorableDf = rawData[rawData['returnQuantity'] > 0].copy()
+    valsFavorableDf = rawData[rawData[target] > 0].copy()
 
     for colName, series in rawData.iteritems():
 
@@ -43,7 +124,7 @@ def mapFeaturesToCondProbs(rawData, featureMask=None):
             colMap = {}
             for uniqueVal in series.unique():
                 allValsCnt = series[series == uniqueVal].count();
-                valsFavorableSeries = (rawData[rawData['returnQuantity'] > 0])[colName]
+                valsFavorableSeries = (rawData[rawData[target] > 0])[colName]
                 valsFavorableCnt = valsFavorableSeries[valsFavorableSeries == uniqueVal].count()
 
                 colMap[uniqueVal] = valsFavorableCnt / allValsCnt
@@ -53,7 +134,11 @@ def mapFeaturesToCondProbs(rawData, featureMask=None):
             # actually apply transform
             series = series.apply(lambda x: colMap[x])
             rawData[colName] = series
-
+    
+    #rename columns modified
+    rawData.columns = [ (x if x == target or not featureMask[x] else "cprob_" + x) 
+                        for x in rawData.columns ]
+    
     return rawData, globalMap
 
 
@@ -139,6 +224,10 @@ def performDateEngineering(rawData, dateColumn):
 
 
 def performOHEOnColumn(data, columnName):
+    """
+        warning: may mutate your input data. cached a copy if needed!
+    """
+    
     # adding all the extra columns
     data = pd.concat([data, pd.get_dummies(data[columnName], prefix=columnName)], axis=1)
 
@@ -383,6 +472,10 @@ def performPostFeatureEngineering(trainData, testData, predictionColumnId, colum
 
     return xTrain,yTrain,xTest,yTest
 
+#! @deprecated, should be replaced with a script for each different
+#!              feature engineering run in stead of everybody modifying the 
+#!              same function whenever they want a dataset.
+#!              (put scripts in ../scriptRuns)
 def getTrainAndTestData(keptColumns, data=None, performOHE=True, performSizeCodeEng=True):
     """
         returns train and test data based
