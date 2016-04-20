@@ -5,8 +5,9 @@ import sys
 from datetime import datetime
 from collections import defaultdict
 from sklearn.cross_validation import train_test_split
-from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize
 import zaCode.FileManager as FileManager
+from sklearn.feature_selection import SelectKBest,f_regression
 
 
 def mapFeaturesToCondProbs(rawData, featureMask=None):
@@ -98,8 +99,9 @@ def normalizeSize(data):
 
 def performSizeCodeEngineering(data):
     # drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
+    # data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
 
+    data = normalizeSize(data)
     return data
 
 
@@ -331,10 +333,60 @@ def getFeatureEngineeredData(data, keptColumns, predictionColumnId=None,  perfor
     return data
 
 
+def selectKBest(xTrain, yTrain, k, columnNames):
+    """
+    Select the K best features based on the variance they have along the training set
+    """
+    selector = SelectKBest(f_regression, k=k)  # k is number of features.
+    newXTrain = selector.fit_transform(xTrain, yTrain)
+
+    #print the remaining features
+    columnNames = [name for name in columnNames if name != 'returnQuantity']
+
+    selectedColumnNames = np.array(columnNames)[selector.get_support()]
+    notSelectedColumnNames = np.array(columnNames)[np.invert(selector.get_support())]
+
+    selectedColumnNames = np.append(selectedColumnNames, 'returnQuantity')
+
+    print("\n\n\n\nAfter Select K Best : Nr features = {}".format(k))
+    print("\nAfter Select K Best : Selected Features = {}".format(selectedColumnNames))
+    print("\nAfter Select K Best : Dismissed Features = {}".format(notSelectedColumnNames))
+
+    return newXTrain,selectedColumnNames
+
+
+def performPostFeatureEngineering(trainData, testData, predictionColumnId, columnNames, selectK = False, standardize = False):
+    """
+     Performs various operations after all the features were created and filtered
+                - Select K Best
+                - Standardize all features
+                - PCA ( to be implemented)
+    """
+    xTrain = trainData.ix[:, trainData.columns != predictionColumnId].values
+    yTrain = trainData[predictionColumnId].values
+
+    #select K best features
+    if selectK:
+        xTrain, selectedColumns = selectKBest(xTrain, yTrain, 20, columnNames)
+        # after we select K best, we filter the testData as well to maintain only those columns
+        testData = testData[selectedColumns].copy()
+
+    xTest = testData.ix[:, testData.columns != predictionColumnId].values
+    yTest = testData[predictionColumnId].values
+
+    #standardizes all the values
+    if standardize:
+        scaler = StandardScaler()
+        xTrain = scaler.fit_transform(xTrain)
+        xTest = scaler.fit_transform(xTest)
+
+
+    return xTrain,yTrain,xTest,yTest
+
 def getTrainAndTestData(keptColumns, data=None, performOHE=True, performSizeCodeEng=True):
     """
         returns train and test data based
-        on input data frame. if None is passed,
+        on input data frame. if None is passed,a
         csv is automatically loaded.
     """
     if data is None:
@@ -343,14 +395,11 @@ def getTrainAndTestData(keptColumns, data=None, performOHE=True, performSizeCode
 
     predictionColumnId = 'returnQuantity'
 
-    data = getFeatureEngineeredData(data, predictionColumnId, keptColumns, performSizeCodeEng, performOHE)
+    data = getFeatureEngineeredData(data, keptColumns, predictionColumnId = predictionColumnId ,performOHE = performOHE, performSizeCodeEng = performSizeCodeEng)
 
+    #split the data into training/test set by a specified ratio
     trainData, testData = train_test_split(data, test_size=0.25)
 
-    xTrain = trainData.ix[:, trainData.columns != predictionColumnId].values
-    yTrain = trainData[predictionColumnId].values
-
-    xTest = testData.ix[:, testData.columns != predictionColumnId].values
-    yTest = testData[predictionColumnId].values
+    xTrain,yTrain,xTest,yTest = performPostFeatureEngineering(trainData, testData, predictionColumnId, data.columns, selectK= False, standardize= False)
 
     return xTrain, yTrain, xTest, yTest

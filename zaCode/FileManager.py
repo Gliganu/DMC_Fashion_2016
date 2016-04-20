@@ -36,6 +36,19 @@ def get100kTrainingData():
 
     return data
 
+def get500kTrainingData():
+    inputFileName = '../data/orders_train_500k.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
+def get250kTrainingData():
+    inputFileName = '../data/orders_train_250k.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
+
 
 def get1000kTrainingData():
     inputFileName = '../data/orders_train_1000k.txt'
