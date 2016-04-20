@@ -41,9 +41,11 @@ class DSetTransform:
         
         #prevent mutation of input data (dropOtherFeats also copies data frame)
         data_filtered = self.dropOtherFeats(data, self.feats_condprob)
-
+        
+        # mask as True, needed only features in fest_condprob
         mask = defaultdict(lambda: False)
         mask.update({ f: True for f in self.feats_condprob })
+        
         data_cprob, probMap = mapFeaturesToCondProbs(data_filtered, mask, self.target)
         
         return data_cprob
@@ -153,32 +155,60 @@ def clusterRetQtyGTOne(rawData):
 
 
 def normalizeSize(data):
+    """
+        returns data with sizeCode col normalised to best represent real clothing size
+        note: renames column as normalisedSizeCode to prevent conflicts
+        warning: modifies data frame passed in.
+    """
+    # No S, ai zis ca "should be reviewed", asa ca m-am uitat peste cod :D 
+    # changes done:
+    # 1.Normalised XS - XL from assigned values directly
+    # 2.Deleted duplicate columns re-normalising A-I using chain indexing. 
+    #   (maybe git merge fail? happened to me as well)
+    # 3.Changed mean computation to exclude A and I values (which were initally == 2, and biasing mean)
+    # 4.Eventually decided to write mean into A and I rows directly, skipping the = 2 part
+    # 5.Renamed column to normalisedSizeCode to prevent clashes
+    # Maybe we want to use .bool() and 'and' somehow instead of bitwise '&' ?
+    #   (even though bitwise and seems to work as well,
+    #    we should test it works more rigurously and then it should be fine)
+    
+    # note initial code renormalised values but we can write
+    # normalised values here directly
     data.loc[(data.sizeCode == 'XS'), 'sizeCode'] = 0
-    data.loc[(data.sizeCode == 'S'), 'sizeCode'] = 1
-    data.loc[(data.sizeCode == 'M'), 'sizeCode'] = 2
-    data.loc[(data.sizeCode == 'L'), 'sizeCode'] = 3
-    data.loc[(data.sizeCode == 'XL'), 'sizeCode'] = 4
-    # set A and I on 2 for now
-    data.loc[(data.sizeCode == 'I'), 'sizeCode'] = 2
-    data.loc[(data.sizeCode == 'A'), 'sizeCode'] = 2
-    # set A and I on 2 for now
-    data['sizeCode'][data['sizeCode'] == 'I'] = 2
-    data['sizeCode'][data['sizeCode'] == 'A'] = 2
-    data.loc[:, 'sizeCode'] = pd.to_numeric(data['sizeCode'])
-    # normalize XS-XL
-    data.loc[(data.sizeCode >= 0) & (data.sizeCode <= 4), 'sizeCode'] = \
-        data.loc[(data.sizeCode >= 0) & (data.sizeCode <= 4), 'sizeCode'] / 4.0
+    data.loc[(data.sizeCode == 'S'), 'sizeCode'] = 1 / 4
+    data.loc[(data.sizeCode == 'M'), 'sizeCode'] = 2 / 4
+    data.loc[(data.sizeCode == 'L'), 'sizeCode'] = 3 / 4
+    data.loc[(data.sizeCode == 'XL'), 'sizeCode'] = 4 / 4
+    
+    # get aux indexing and copy data
+    notAorIindex = (data['sizeCode'] != 'A') & (data['sizeCode'] != 'I')
+    numericData = pd.to_numeric(data[notAorIindex]['sizeCode']) # pd.to_numeric automatically copies
+    
+    # dropped 'sizeCode' indexing since numericData is now a single column
     # normalize 32-44
-    data.loc[(data.sizeCode <= 44) & (data.sizeCode >= 32), 'sizeCode'] = \
-        (data.loc[(data.sizeCode <= 44) & (data.sizeCode >= 32), 'sizeCode'] - 32.0) / (44.0 - 32.0)
+    numericData.loc[(numericData <= 44) & (numericData >= 32)] = \
+        (numericData.loc[(numericData <= 44) & (numericData >= 32)] - 32.0) / (44.0 - 32.0)
+    
     # normalize 24-33
-    data.loc[(data.sizeCode <= 33) & (data.sizeCode >= 24), 'sizeCode'] = \
-        (data.loc[(data.sizeCode <= 33) & (data.sizeCode >= 24), 'sizeCode'] - 24.0) / (33.0 - 24.0)
+    numericData.loc[(numericData <= 33) & (numericData >= 24)] = \
+        (numericData.loc[(numericData <= 33) & (numericData >= 24)] - 24.0) / (33.0 - 24.0)
+    
     # normalize 75-100
-    data.loc[(data.sizeCode <= 100) & (data.sizeCode >= 75), 'sizeCode'] = \
-        (data.loc[(data.sizeCode <= 100) & (data.sizeCode >= 75), 'sizeCode'] - 75.0) / (100.0 - 75.0)
-    # set I and A to mean for the moment
-    data.loc[(data.sizeCode == 2), 'sizeCode'] = data['sizeCode'].mean()
+    numericData.loc[(numericData <= 100) & (numericData >= 75)] = \
+        (numericData.loc[(numericData <= 100) & (numericData >= 75)] - 75.0) / (100.0 - 75.0)
+    
+    # writeback numericData into original dataframe
+    # maybe we can work with data.loc in-place as the original did?
+    # that means we should filter 'A' and 'I' out somehow first, 
+    # otherwise <= and >= don't work for indexing
+    data.loc[notAorIindex, 'sizeCode'] = numericData
+    
+    # set I and A to mean of the rest for the moment
+    data.loc[notAorIindex.apply(lambda v: not v), 'sizeCode'] = data.loc[notAorIindex, 'sizeCode'].mean()
+    
+    # maybe update directly only 'sizeCode' location in list? O(n) anyways for find.
+    data.columns = [ c if c != 'sizeCode' else 'normalisedSizeCode' for c in data.columns ]
+    
     return data
 
 
