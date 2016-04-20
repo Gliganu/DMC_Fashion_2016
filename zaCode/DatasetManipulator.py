@@ -17,7 +17,6 @@ import zaCode.FileManager as FileManager
 class DSetTransform:
     """ Class Transforms a  by dropping or replacing features
         Currently implements OHE, Conditional Probability and Dropping Cols.
-        TODO Test.
     """
     
     def __init__(self, 
@@ -169,6 +168,7 @@ def normalizeSize(data):
     # 4.Eventually decided to write mean into A and I rows directly, skipping the = 2 part
     # 5.Renamed column to normalisedSizeCode to prevent clashes
     # Maybe we want to use .bool() and 'and' somehow instead of bitwise '&' ?
+    # this is also an issue when using not(...), we need to use .apply(lambda v: not v) instead
     #   (even though bitwise and seems to work as well,
     #    we should test it works more rigurously and then it should be fine)
     
@@ -204,6 +204,7 @@ def normalizeSize(data):
     data.loc[notAorIindex, 'sizeCode'] = numericData
     
     # set I and A to mean of the rest for the moment
+    # apparently pandas complains about not(...) so I'm using the apply with lambda
     data.loc[notAorIindex.apply(lambda v: not v), 'sizeCode'] = data.loc[notAorIindex, 'sizeCode'].mean()
     
     # maybe update directly only 'sizeCode' location in list? O(n) anyways for find.
