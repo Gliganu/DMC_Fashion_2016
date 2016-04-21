@@ -8,12 +8,6 @@ import matplotlib.pyplot as plt
 def performValidation(yPred, yTest):
     print(metrics.classification_report(yPred, yTest))
 
-    numberOver = sum(yPred > yTest)
-    numberUnder = sum(yPred < yTest)
-    numberEqual = sum(yPred == yTest)
+    print("\nNumber of test entries: {}".format(len(yTest)))
 
-    print("Number Over {}".format(numberOver))
-    print("Number Under {}".format(numberUnder))
-    print("Number Equal {}".format(numberEqual))
-
-    print(sum(abs(yPred - yTest)))
+    print("\nScore: {}".format(sum(abs(yPred - yTest))))

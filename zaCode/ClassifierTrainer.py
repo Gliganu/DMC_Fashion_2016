@@ -79,9 +79,9 @@ def trainClassifier(xTrain,yTrain):
 
     print("Training classifier...")
 
-    # classifier = trainLogisticRegression(xTrain, yTrain)
+    classifier = trainLogisticRegression(xTrain, yTrain)
     # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
-    classifier = trainNB(xTrain, yTrain)
+    # classifier = trainNB(xTrain, yTrain)
 
     return classifier

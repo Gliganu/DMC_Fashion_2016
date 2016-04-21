@@ -213,14 +213,6 @@ def normalizeSize(data):
     return data
 
 
-def performSizeCodeEngineering(data):
-    # drop everything that is not digit. About 200k examples ( maybe not the best way )
-    # data = data[data['sizeCode'].apply(lambda x: x.isnumeric())]
-
-    data = normalizeSize(data)
-    return data
-
-
 def constructBasketColumns(data):
     print("Constructing basket size and quantity features...")
     grouped_by_orderID = data['quantity'].groupby(data['orderID'])
@@ -269,9 +261,7 @@ def performOHEOnColumn(data, columnName):
 
 
 def performSizeCodeEngineering(data):
-    # drop everything that is not digit. About 200k examples ( maybe not the best way )
-    data = data[data['sizeCode'].apply(lambda x: x.isdigit())]
-
+    data = normalizeSize(data)
     # avoid chain indexing warning
     return data.copy()
 
@@ -307,8 +297,7 @@ def constructItemPercentageReturnColumn(data):
     dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['articleID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
-        'quantity']
+    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
     idToPercDict = dataSummedByCustomer.to_dict().get('itemPercentageReturned')
@@ -320,14 +309,10 @@ def constructItemPercentageReturnColumn(data):
     return dataCopy
 
 
-def constructPolynomialFeatures(data):
+def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only=True, include_bias=False):
     print("Constructing polynomial features....")
 
-    # get only the target columns
-    features = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'percentageReturned', 'overpriced',
-                'discountedAmount']
-
-    targetData = data[features].copy()
+    targetData = data[sourceFeatures].copy()
 
     # standardize everything
     dataMatrix = targetData.as_matrix().astype(np.float)
@@ -335,15 +320,15 @@ def constructPolynomialFeatures(data):
     dataMatrix = scaler.fit_transform(dataMatrix)
 
     # construct polynomial features
-    polynomialFeatures = PolynomialFeatures(interaction_only=True, include_bias=False)
+    polynomialFeatures = PolynomialFeatures(degree=degree, interaction_only=interaction_only, include_bias=include_bias)
     newColumnsMatrix = polynomialFeatures.fit_transform(dataMatrix)
 
     newColumnsNames = []
 
-    # construct the names of the newly generated features as we only have a matrix of numbers now
+    # construct the names of the newly generated sourceFeatures as we only have a matrix of numbers now
     for entry in polynomialFeatures.powers_:
         newFeature = []
-        for feat, coef in zip(features, entry):
+        for feat, coef in zip(sourceFeatures, entry):
             if coef > 0:
                 newFeature.append(feat + '^' + str(coef))
         if not newFeature:
@@ -353,27 +338,25 @@ def constructPolynomialFeatures(data):
 
     newColumnsDataFrame = pd.DataFrame(newColumnsMatrix, columns=newColumnsNames)
 
-    # drop all the features which are themselves to the power 1  ( as they already exist )
-    newColumnsToBeDeleted = [featureName + "^1" for featureName in features]
+    # drop all the sourceFeatures which are themselves to the power 1  ( as they already exist )
+    newColumnsToBeDeleted = [featureName + "^1" for featureName in sourceFeatures]
     newColumnsDataFrame = newColumnsDataFrame.drop(newColumnsToBeDeleted, 1)
 
-    data = data.join(newColumnsDataFrame)
+    finalData = data.join(newColumnsDataFrame)
+
+    #todo one extra row added at the end. weird. to investigate
+    finalData = finalData.dropna()
+
+    return finalData
+
+
+def constructOverpricedColumn(data):
+    data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
     return data
 
-
-def addNewFeatures(data):
-    # see whether the product was overpriced. price > recommended
-    data.loc[:, 'overpriced'] = data['price'] > data['rrp']
-
-    # see how much the data was discounted ( if price == 0, divide by 1 )
+def constructDiscountAmountColumn(data):
     data.loc[:, 'discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr, 1))
-
-    data = constructPercentageReturnColumn(data)
-    data = constructItemPercentageReturnColumn(data)
-    data = constructBasketColumns(data)
-
-    data = constructPolynomialFeatures(data)
 
     return data
 
@@ -385,70 +368,36 @@ def performColorCodeEngineering(data):
     return data
 
 
-def handleMissingValues(data):
-    data = data.dropna()
+def dropMissingValues(data):
+    return data.dropna()
 
-    # ORRRR
-    #
-    # productGroupImputer = Imputer(missing_values='NaN', strategy='median')
-    # data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
-    #
-    # rrpImputer = Imputer(missing_values='NaN', strategy='mean')
-    # data['rrp'] = rrpImputer.fit_transform(data['rrp'])
-    #
-    # #todo for the voucherID column, 6 values missing, decide the strategy for those. in mean time, drop them
-    # data = data.dropna()
-    #
 
+def fillMissingValues(data, productGroupStategy = 'median', rrpStrategy = 'mean'):
+    """
+    Fills the missing values in the columns which suffer from this.
+    """
+
+    productGroupImputer = Imputer(missing_values='NaN', strategy=productGroupStategy)
+    data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
+
+    rrpImputer = Imputer(missing_values='NaN', strategy=rrpStrategy)
+    data['rrp'] = rrpImputer.fit_transform(data['rrp'])
+
+    #for the voucher ID column, 6 values missing. drop them
+    data = dropMissingValues(data)
 
     return data
 
 
-def getFeatureEngineeredData(data, keptColumns, predictionColumnId=None,  performOHE=True, performSizeCodeEng=True):
-    print ("Performing feature engineering...")
-    # orderID;
-    # orderDate;
-    # articleID;
-    # colorCode;
-    # sizeCode;
-    # productGroup;
-    # quantity;
-    # price;
-    # rrp;
-    # voucherID;
-    # voucherAmount;
-    # customerID;
-    # deviceID;
-    # paymentMethod;
-    # returnQuantity
+def filterColumns(data, columnNames):
+    data = data[columnNames].copy()
 
-    if predictionColumnId:
-        keptColumns.append(predictionColumnId)
+    print("\nKept columns ({}) : {} ".format(len(columnNames), columnNames))
+    return data
 
-    # avoid chain indexing warning
-    data = data[keptColumns].copy()
 
-    # construct additional features as a mixture of various ones
-    data = addNewFeatures(data)
-
-    # drop NAs
-    data = handleMissingValues(data)
-
-    # restrict prediction to 0/1 for now. Map everything greater than 1 to 1
+def restrictReturnQuantityToBinaryChoice(data):
     data['returnQuantity'] = data['returnQuantity'].apply(lambda retQuant: min(retQuant, 1))
-
-    if performOHE:
-        data = performOHEOnColumn(data, 'deviceID')
-        data = performOHEOnColumn(data, 'paymentMethod')
-
-    if performSizeCodeEng:
-        data = performSizeCodeEngineering(data)
-
-    data = performColorCodeEngineering(data)
-
-    data = performDateEngineering(data, 'orderDate')
-
-    print("\nKept columns ({}) : {} ".format(len(data.columns), data.columns))
 
     return data
 
@@ -470,60 +419,36 @@ def selectKBest(xTrain, yTrain, k, columnNames):
 
     print("\n\n\n\nAfter Select K Best : Nr features = {}".format(k))
     print("\nAfter Select K Best : Selected Features = {}".format(selectedColumnNames))
-    print("\nAfter Select K Best : Dismissed Features = {}".format(notSelectedColumnNames))
+    # print("\nAfter Select K Best : Dismissed Features = {}".format(notSelectedColumnNames))
 
     return newXTrain,selectedColumnNames
 
 
-def performPostFeatureEngineering(trainData, testData, predictionColumnId, columnNames, selectK = False, standardize = False):
+def getXandYMatrix(data,predictionColumnName):
     """
-     Performs various operations after all the features were created and filtered
-                - Select K Best
-                - Standardize all features
-                - PCA ( to be implemented)
+    Being given a dataframe, it splits it's columns into X containing the training features and y being the prediciton feature
     """
-    xTrain = trainData.ix[:, trainData.columns != predictionColumnId].values
-    yTrain = trainData[predictionColumnId].values
 
-    #select K best features
-    if selectK:
-        xTrain, selectedColumns = selectKBest(xTrain, yTrain, 20, columnNames)
-        # after we select K best, we filter the testData as well to maintain only those columns
-        testData = testData[selectedColumns].copy()
+    X = data.ix[:, data.columns != predictionColumnName].values
+    y = data[predictionColumnName].values
 
-    xTest = testData.ix[:, testData.columns != predictionColumnId].values
-    yTest = testData[predictionColumnId].values
+    return X,y
 
-    #standardizes all the values
-    if standardize:
-        scaler = StandardScaler()
-        xTrain = scaler.fit_transform(xTrain)
-        xTest = scaler.fit_transform(xTest)
-
-
-    return xTrain,yTrain,xTest,yTest
-
-#! @deprecated, should be replaced with a script for each different
-#!              feature engineering run in stead of everybody modifying the 
-#!              same function whenever they want a dataset.
-#!              (put scripts in ../scriptRuns)
-def getTrainAndTestData(keptColumns, data=None, performOHE=True, performSizeCodeEng=True):
+def scaleMatrix(dataMatrix):
     """
-        returns train and test data based
-        on input data frame. if None is passed,a
-        csv is automatically loaded.
+    Scales all the columns in the matrix
     """
-    if data is None:
-        print("No data passed, reading CSV...")
-        data = FileManager.getWholeTrainingData()
 
-    predictionColumnId = 'returnQuantity'
+    scaler = StandardScaler()
+    return scaler.fit_transform(dataMatrix)
 
-    data = getFeatureEngineeredData(data, keptColumns, predictionColumnId = predictionColumnId ,performOHE = performOHE, performSizeCodeEng = performSizeCodeEng)
 
-    #split the data into training/test set by a specified ratio
-    trainData, testData = train_test_split(data, test_size=0.25)
 
-    xTrain,yTrain,xTest,yTest = performPostFeatureEngineering(trainData, testData, predictionColumnId, data.columns, selectK= False, standardize= False)
+def performTrainTestSplit(data, test_size):
+    """
+    Being given a dataframe and a testSize, it splits the data into training/test examples randomly according to the size provided
+    """
 
-    return xTrain, yTrain, xTest, yTest
+    trainData, testData = train_test_split(data, test_size=test_size)
+
+    return trainData, testData
