@@ -1,21 +1,10 @@
-import pandas as pd
-import numpy as np
-import math
-import sys
-
-from datetime import datetime
-from collections import defaultdict
-from copy import copy
-
-from sklearn.cross_validation import train_test_split
-from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize
-from sklearn.feature_selection import SelectKBest, f_regression
-
-import zaCode.FileManager as FileManager
-import zaCode.DatasetManipulator as Toolbox
-import zaCode.Validator as Validator
-import zaCode.ClassifierTrainer as ClassifierTrainer
 import time
+
+import zaCode.ClassifierTrainer as ClassifierTrainer
+import zaCode.DatasetManipulator as Toolbox
+import zaCode.FileManager as FileManager
+import zaCode.Validator as Validator
+from zaCode import Visualizer
 
 
 def addNewFeatures(data):
@@ -24,7 +13,7 @@ def addNewFeatures(data):
 
     data = Toolbox.constructDiscountAmountColumn(data)
 
-    data = Toolbox.constructPercentageReturnColumn(data)
+    data = Toolbox.constructArticleIdSuffixColumn(data)
 
     data = Toolbox.constructItemPercentageReturnColumn(data)
 
@@ -48,7 +37,9 @@ def engineerOldFeatures(data):
 
 def makePrediction():
     print("Reading data...")
-    data = FileManager.get100kTrainingData()
+
+    data = FileManager.getRandomTrainingData(500000)
+    # data = FileManager.get10kTrainingData()
 
     keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
@@ -71,22 +62,30 @@ def makePrediction():
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'percentageReturned', 'overpriced',
     #             'discountedAmount']
-    polynomialFeaturesSourceColumns = data.columns
-    data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
-
+    # polynomialFeaturesSourceColumns = data.columns
+    # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
 
     #Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
 
+    #construct the percentage return column
+    trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
+
+
+    print("\n\nFinal columns {} : {}".format(len(trainData.columns),trainData.columns))
+
     #X and Y train
     xTrain,yTrain = Toolbox.getXandYMatrix(trainData,'returnQuantity')
 
+    xTrain = Toolbox.scaleMatrix(xTrain)
+
     #Select K best features according to variance
-    xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, data.columns)
-    testData = testData[selectedColumns].copy()
+    # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, data.columns)
+    # testData = testData[selectedColumns].copy()
 
     # X and Y test
     xTest, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
+    xTest = Toolbox.scaleMatrix(xTest)
 
     #Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
@@ -96,12 +95,13 @@ def makePrediction():
 
     #Assessing the performance
     Validator.performValidation(yPred, yTest)
-
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
 
 
 if __name__ == '__main__':
     startTime = time.time()
 
+    # play()
     makePrediction()
 
     # Visualizer.calculateLearningCurve(keptColumns)

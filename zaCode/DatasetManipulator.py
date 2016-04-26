@@ -12,6 +12,7 @@ from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, n
 from sklearn.feature_selection import SelectKBest,f_regression
 
 import zaCode.FileManager as FileManager
+from collections import defaultdict
 
 
 class DSetTransform:
@@ -214,7 +215,7 @@ def normalizeSize(data):
 
 
 def constructBasketColumns(data):
-    print("Constructing basket size and quantity features...")
+    print("Constructing BasketSize and BasketQuantity features...")
     grouped_by_orderID = data['quantity'].groupby(data['orderID'])
 
     aggregated = pd.DataFrame()
@@ -266,26 +267,46 @@ def performSizeCodeEngineering(data):
     return data.copy()
 
 
-def constructPercentageReturnColumn(data):
+def printNumberOfCustomersSeen(trainData, testData):
+    trainCustomer = pd.Series(trainData['customerID'].unique())
+    testCustomer = pd.Series(testData['customerID'].unique())
+
+    totalTrainCustomer = trainCustomer.size
+    seenCustomersNumber = trainCustomer.isin(testCustomer).sum()
+
+    print("Percentage of already seen customers in test set: {}".format(seenCustomersNumber / totalTrainCustomer))
+
+
+def constructPercentageReturnColumn(trainData, testData ):
     print("Constructing PercentageReturn feature....")
-
+        
+    printNumberOfCustomersSeen(trainData,testData)
+    
     # avoid chain indexing warning
-    dataCopy = data.copy()
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
 
-    dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
+    #construct the dictionary only on the information in the training set
+    dataByCustomer = trainDataCopy[['quantity', 'returnQuantity']].groupby(trainDataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
-        'quantity']
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
-    idToPercDict = dataSummedByCustomer.to_dict().get('percentageReturned')
+    #if customer not found, the default percentage will be 0
+    idToPercDict = defaultdict(lambda: 0)
 
-    dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
+    #append the other dictionary
+    idToPercDict.update(dataSummedByCustomer.to_dict().get('percentageReturned'))
 
-    dataCopy = dataCopy.drop(['customerID'], 1)
+    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
 
-    return dataCopy
+    trainDataCopy = trainDataCopy.drop(['customerID'], 1)
+    testDataCopy = testDataCopy.drop(['customerID'], 1)
+
+    return trainDataCopy,testDataCopy
 
 
 def constructItemPercentageReturnColumn(data):
@@ -363,10 +384,14 @@ def constructDiscountAmountColumn(data):
 
 def performColorCodeEngineering(data):
     # get the thousands digit. in the color RAL system, that represents the "Base" color
-    data['colorCode'] = data['colorCode'].apply(lambda code: int(code) / 1000)
+    data['colorCode'] = data['colorCode'].apply(lambda code: int(code / 1000))
 
     return data
 
+def constructArticleIdSuffixColumn(data):
+    data['articleIdSuffix'] = data['articleID'].apply(lambda id: int(id[4:]))
+
+    return data
 
 def dropMissingValues(data):
     return data.dropna()
@@ -447,8 +472,12 @@ def scaleMatrix(dataMatrix):
 def performTrainTestSplit(data, test_size):
     """
     Being given a dataframe and a testSize, it splits the data into training/test examples randomly according to the size provided
+
+    Returns them in order !!
     """
 
-    trainData, testData = train_test_split(data, test_size=test_size)
+    numberTraining = math.ceil(data.shape[0] * (1 - test_size))
+    trainData = data.iloc[0: numberTraining]
+    testData = data.iloc[numberTraining:]
 
     return trainData, testData
