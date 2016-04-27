@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import math
 import sys
+import random
 
 from datetime import datetime
 from collections import defaultdict
@@ -12,11 +13,9 @@ from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, n
 from sklearn.feature_selection import SelectKBest,f_regression
 
 import zaCode.FileManager as FileManager
-from collections import defaultdict
-
 
 class DSetTransform:
-    """ Class Transforms a  by dropping or replacing features
+    """ Class Transforms a  by dropping or replacing features and partitioning data set
         Currently implements OHE, Conditional Probability and Dropping Cols.
     """
     
@@ -30,7 +29,31 @@ class DSetTransform:
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
+    
+    def partition(self, data, fraction):
+        """ partitions dataset into two sets, containing fraction and 1-fraction 
+            percentages of the data.
+            0 <= fraction <= 1
+        """
+        #i'd use traint_test_split but that is designed for other purposes 
         
+        random.seed() # systime used
+        
+        A = pd.DataFrame(columns = data.columns)
+        B = pd.DataFrame(columns = data.columns)
+        
+        for idx in data.index:
+            
+            if random.random() < fraction:
+                for cname, series in data.iteritems():
+                    A.loc[idx, cname] = series[idx]
+            else:    
+                for cname, series in data.iteritems():
+                    B.loc[idx, cname] = series[idx]
+    
+        return A, B
+        
+    
     def transformCondProb(self, data):
         """
             returns data with columns transformed according
