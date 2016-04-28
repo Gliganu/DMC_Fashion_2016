@@ -262,9 +262,9 @@ def constructWeekDayColumn(data):
 
 
 def performDateEngineering(rawData, dateColumn):
-    # rawData[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
-    # rawData[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
     data = constructWeekDayColumn(rawData)
+    data[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
+    data[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
     data = data.drop([dateColumn], 1)
 
     return data
@@ -317,19 +317,52 @@ def constructPercentageReturnColumn(trainData, testData ):
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
-    #if customer not found, the default percentage will be 0
-    idToPercDict = defaultdict(lambda: 0)
+    #computing the average percentage across all customers
+    summedByCustomerDict = dataSummedByCustomer.to_dict().get('percentageReturned')
+    percentagesList = list(summedByCustomerDict.values())
+    averagePercetangeOfReturn = sum(percentagesList)/float(len(percentagesList))
+
+    #if customer not found, the default percentage will be the average of percetages
+    idToPercDict = defaultdict(lambda: averagePercetangeOfReturn)
 
     #append the other dictionary
-    idToPercDict.update(dataSummedByCustomer.to_dict().get('percentageReturned'))
+    idToPercDict.update(summedByCustomerDict)
 
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
     testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
 
-    trainDataCopy = trainDataCopy.drop(['customerID'], 1)
-    testDataCopy = testDataCopy.drop(['customerID'], 1)
+    return trainDataCopy,testDataCopy
+
+def constructCustomerMedianSizeAndColor(trainData,testData):
+
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+
+    trainDataCopy['normalisedSizeCode'] = pd.to_numeric(trainDataCopy['normalisedSizeCode'])
+
+    trainDataCopy = np.round(trainDataCopy, 2)
+
+    groupedByCustomer = trainDataCopy[['normalisedSizeCode', 'colorCode']].groupby(trainDataCopy['customerID'])
+
+    median = groupedByCustomer.median()
+
+    # if customer not found, the default will be 0
+    idToSize = defaultdict(lambda: 0)
+    idToColor = defaultdict(lambda: 0)
+
+    # append the other dictionary
+    idToSize.update(median.to_dict().get('normalisedSizeCode'))
+    idToColor.update(median.to_dict().get('colorCode'))
+
+    #add new colums in the dataframes
+    trainDataCopy.loc[:, 'customerMedianColor'] = trainDataCopy['customerID'].apply(lambda custId: idToSize[custId])
+    trainDataCopy.loc[:, 'customerMedianSize'] = trainDataCopy['customerID'].apply(lambda custId: idToColor[custId])
+
+    testDataCopy.loc[:, 'customerMedianColor'] = testDataCopy['customerID'].apply(lambda custId: idToSize[custId])
+    testDataCopy.loc[:, 'customerMedianSize'] = testDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
     return trainDataCopy,testDataCopy
+
 
 
 def constructItemPercentageReturnColumn(data):
@@ -354,6 +387,9 @@ def constructItemPercentageReturnColumn(data):
 
 
 def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only=True, include_bias=False):
+    """"
+    THIS HAS A BUG ! DON'T USE FOR NOW.
+    """
     print("Constructing polynomial features....")
 
     targetData = data[sourceFeatures].copy()
@@ -494,7 +530,9 @@ def scaleMatrix(dataMatrix):
 
 def performTrainTestSplit(data, test_size):
     """
-    Being given a dataframe and a testSize, it splits the data into training/test examples randomly according to the size provided
+    Being given a dataframe and a testSize, it splits the data into training/test examples according to the size provided
+
+    Test size is percent !!
 
     Returns them in order !!
     """
