@@ -446,7 +446,7 @@ def constructOrderDuplicatesCountColumn(data):
     return dataCopy
 
 
-def contructOrderDuplicatesDistinctColorCountColumn(data):
+def contructOrderDuplicatesDistinctColorColumn(data):
     print("Constructing order duplicate with distinct color count feature")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
@@ -458,21 +458,14 @@ def contructOrderDuplicatesDistinctColorCountColumn(data):
     # if nunique is 1, duplicateDistinctColor must be 0 (we either have non-duplicate article, hence 1 unique color,
     # or duplicate article, with one unique color)
     aggregated['duplicateDistinctColor'] = aggregated[('colorCode', 'nunique')].apply(lambda x: 0 if x == 1 else 1)
-    # reset indices - want to have orderID as column, not index, in order to perform yet another group by
-    aggregated.reset_index(inplace=True)
-    # drop unused columns - will have just orderID and count of unique color codes per article
-    final = aggregated.drop([('articleID', ''), ('colorCode', 'nunique')], axis=1)
-    # group again by order id
-    groupedByOrderFinal = final.groupby('orderID')
-    # sum up
-    finalDuplicateColors = groupedByOrderFinal.agg([np.sum], level=0)
-    duplicateWithDistinctColorDict = finalDuplicateColors.to_dict().get(('duplicateDistinctColor', '', 'sum'))
-    dataCopy['orderDuplicatesDistinctColorCount'] = dataCopy['orderID'].apply(
-        lambda orderId: duplicateWithDistinctColorDict.get(orderId))
+    final = aggregated.drop([('colorCode', 'nunique')], axis=1)
+    distinctColorDict = final.to_dict().get(('duplicateDistinctColor', ''))
+    data['distinctColorDuplicate'] = data.apply(lambda row: distinctColorDict[(row['orderID'], row['articleID'])],
+                                                axis=1)
     return dataCopy
 
 
-def constructOrderDuplicatesDistinctSizeCountColumn(data):
+def constructOrderDuplicatesDistinctSizeColumn(data):
     print("Constructing order duplicate with distinct size count feature")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
@@ -484,17 +477,9 @@ def constructOrderDuplicatesDistinctSizeCountColumn(data):
     # if nunique is 1, duplicateDistinctColor must be 0 (we either have non-duplicate article, hence 1 unique size,
     # or duplicate article, with one unique size)
     aggregated['duplicateDistinctSize'] = aggregated[('sizeCode', 'nunique')].apply(lambda x: 0 if x == 1 else 1)
-    # reset indices - want to have orderID as column, not index, in order to perform yet another group by
-    aggregated.reset_index(inplace=True)
-    # drop unused columns - will have just orderID and count of unique size codes per article
-    final = aggregated.drop([('articleID', ''), ('sizeCode', 'nunique')], axis=1)
-    # group again by order id
-    groupedByOrderFinal = final.groupby('orderID')
-    # sum up
-    finalDuplicateSizes = groupedByOrderFinal.agg([np.sum], level=0)
-    duplicateWithDistinctSizeDict = finalDuplicateSizes.to_dict().get(('duplicateDistinctSize', '', 'sum'))
-    dataCopy['orderDuplicatesDistinctSizeCount'] = dataCopy['orderID'].apply(
-        lambda orderId: duplicateWithDistinctSizeDict.get(orderId))
+    final = aggregated.drop([('sizeCode', 'nunique')], axis=1)
+    distinctSizeDict = final.to_dict().get(('duplicateDistinctSize', ''))
+    data['distinctSizeDuplicate'] = data.apply(lambda row: distinctSizeDict[(row['orderID'], row['articleID'])], axis=1)
     return dataCopy
 
 

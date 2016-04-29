@@ -10,9 +10,9 @@ from zaCode import Visualizer
 def addNewFeatures(data):
     data = Toolbox.constructOrderDuplicatesCountColumn(data)
 
-    data = Toolbox.contructOrderDuplicatesDistinctColorCountColumn(data)
+    data = Toolbox.contructOrderDuplicatesDistinctColorColumn(data)
 
-    data = Toolbox.constructOrderDuplicatesDistinctSizeCountColumn(data)
+    data = Toolbox.constructOrderDuplicatesDistinctSizeColumn(data)
 
     data = Toolbox.constructOverpricedColumn(data)
 
@@ -75,7 +75,7 @@ def makePrediction():
     trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
 
     #construct the percentage return column
-    # trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
+    trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
     trainData,testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
