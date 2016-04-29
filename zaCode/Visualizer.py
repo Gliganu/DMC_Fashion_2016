@@ -87,22 +87,20 @@ def calculateRocCurve():
     plt.xlabel('False Positive Rate')
     plt.show()
 
-def calculateLearningCurve():
-    # classifier = ClassifierTrainer.constructGradientBoostingClassifier()
-    # trainData = dataReader.getTrainData()
-    #
-    # # feature engineering
-    # trainData =  featureExtractor.convertTargetFeatureToNumeric(trainData)
-    # xTrain, yTrain = featureExtractor.getRegularFeatures(trainData, True)
+def calculateLearningCurve(keptColumns):
 
     # construct Train & Test Data
-    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData(keptColumns)
 
     # training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
+    # for full dataset
+    trainSizes =  np.linspace(100000,1136593,5,dtype=int)
 
-    trainSizes =  np.linspace(100000,1218424,5,dtype=int)
+    # for 1 mil
+    # trainSizes =  np.linspace(100000,493055,5,dtype=int)
+
 
     plot_learning_curve(classifier,xTrain,yTrain,trainSizes)
 

@@ -11,7 +11,7 @@ from sklearn.cross_validation import StratifiedKFold
 from sklearn.naive_bayes import MultinomialNB
 
 def trainLogisticRegression(xTrain, yTrain):
-    classifier = LogisticRegression(n_jobs=-1, verbose=1)
+    classifier = LogisticRegression(n_jobs=-1, verbose=1, solver="lbfgs")
 
     classifier.fit(xTrain, yTrain)
 
@@ -80,7 +80,7 @@ def trainClassifier(xTrain,yTrain):
     print("Training classifier...")
 
     # classifier = trainLogisticRegression(xTrain, yTrain)
-    classifier = trainLogisticRegression(xTrain, yTrain)
+    classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
     # classifier = trainNB(xTrain, yTrain)
 

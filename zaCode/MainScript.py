@@ -7,9 +7,10 @@ import zaCode.Visualizer as Visualizer
 import time
 import numpy as np
 
-def makePrediction():
+def makePrediction(keptColumns):
+
     # construct Train & Test Data
-    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData()
+    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData(keptColumns)
 
     # training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
@@ -21,19 +22,17 @@ def makePrediction():
     Validator.performValidation(yPred, yTest)
 
 
-def play():
-    data = FileManager.get10kTrainingData()
-
-    # DatasetManipulator.constructPercentageReturnColumn(data)
-#
-
 if __name__ == '__main__':
     startTime = time.time()
 
-    makePrediction()
 
-    # play()
-    # Visualizer.calculateLearningCurve()
+    keptColumns = ['orderDate','orderID', 'colorCode', 'quantity',
+                   'price', 'rrp', 'deviceID', 'paymentMethod',
+                   'sizeCode', 'voucherAmount', 'customerID', 'articleID']
+
+    makePrediction(keptColumns)
+
+    # Visualizer.calculateLearningCurve(keptColumns)
     # Visualizer.calculateRocCurve()
 
 

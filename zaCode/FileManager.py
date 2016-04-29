@@ -1,5 +1,5 @@
 import pandas as pd
-
+from sklearn.cross_validation import train_test_split
 
 def getWholeTrainingData():
     inputFileName = '../data/orders_train.txt'
@@ -15,12 +15,14 @@ def getTestData():
     return data
 
 
-# added these 'peasanty' functions becauuse although we could've read the whole csv and trim the data frame after, it's faster this way
-def get1kTrainingData():
-    inputFileName = '../data/orders_train_1k.txt'
-    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+def getRandomTrainingData(size):
+    """
+    Randomly selects "size" entries from the whole dataset.
+    """
+    data = getWholeTrainingData()
+    train, _ = train_test_split(data, train_size=size)
 
-    return data
+    return train
 
 
 def get10kTrainingData():
@@ -35,6 +37,19 @@ def get100kTrainingData():
     data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
 
     return data
+
+def get500kTrainingData():
+    inputFileName = '../data/orders_train_500k.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
+def get250kTrainingData():
+    inputFileName = '../data/orders_train_250k.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
 
 
 def get1000kTrainingData():
