@@ -3,57 +3,54 @@ import numpy as np
 import math
 import sys
 import random
-
 from datetime import datetime
 from collections import defaultdict
 from copy import copy
-
 from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize
-from sklearn.feature_selection import SelectKBest,f_regression
-
+from sklearn.feature_selection import SelectKBest, f_regression
 import zaCode.FileManager as FileManager
+
 
 class DSetTransform:
     """ Class Transforms a  by dropping or replacing features and partitioning data set
         Currently implements OHE, Conditional Probability and Dropping Cols.
     """
-    
-    def __init__(self, 
-                 feats_kept = [],
-                 feats_ohe = [],
-                 feats_condprob = [],
-                 target = 'returnQuantity'):
-        
+
+    def __init__(self,
+                 feats_kept=[],
+                 feats_ohe=[],
+                 feats_condprob=[],
+                 target='returnQuantity'):
+
         self.feats_kept = feats_kept
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
-    
+
     def partition(self, data, fraction):
         """ partitions dataset into two sets, containing fraction and 1-fraction 
             percentages of the data.
             0 <= fraction <= 1
         """
-        #i'd use traint_test_split but that is designed for other purposes 
-        
-        random.seed() # systime used
-        
-        A = pd.DataFrame(columns = data.columns)
-        B = pd.DataFrame(columns = data.columns)
-        
+        # i'd use traint_test_split but that is designed for other purposes
+
+        random.seed()  # systime used
+
+        A = pd.DataFrame(columns=data.columns)
+        B = pd.DataFrame(columns=data.columns)
+
         for idx in data.index:
-            
+
             if random.random() < fraction:
                 for cname, series in data.iteritems():
                     A.loc[idx, cname] = series[idx]
-            else:    
+            else:
                 for cname, series in data.iteritems():
                     B.loc[idx, cname] = series[idx]
-    
+
         return A, B
-        
-    
+
     def transformCondProb(self, data):
         """
             returns data with columns transformed according
@@ -61,45 +58,45 @@ class DSetTransform:
             column named f will be replaced with conditional
             probability P(target > 0 | f).
         """
-        
-        #prevent mutation of input data (dropOtherFeats also copies data frame)
+
+        # prevent mutation of input data (dropOtherFeats also copies data frame)
         data_filtered = self.dropOtherFeats(data, self.feats_condprob)
-        
+
         # mask as True, needed only features in fest_condprob
         mask = defaultdict(lambda: False)
-        mask.update({ f: True for f in self.feats_condprob })
-        
+        mask.update({f: True for f in self.feats_condprob})
+
         data_cprob, probMap = mapFeaturesToCondProbs(data_filtered, mask, self.target)
-        
+
         return data_cprob
-    
+
     def transformOHE(self, data):
         """
             returns data with binary columns for each categorical
             feature named in feats_ohe, and initial feature dropped
         """
-        
-        #prevent mutation of input data (dropOtherFeats also copies data frame)
+
+        # prevent mutation of input data (dropOtherFeats also copies data frame)
         data = self.dropOtherFeats(data, self.feats_ohe)
         for f in self.feats_ohe:
             data = performOHEOnColumn(data, f)
-        
+
         return data
-    
-    def dropOtherFeats(self, data, feats_kept = None):
+
+    def dropOtherFeats(self, data, feats_kept=None):
         """
             returns new data frame containing only target varible
             and features contained in feats_kept
         """
         if feats_kept is None:
             feats_kept = self.feats_kept
-            
+
         col_index = copy(feats_kept)
         col_index.append(self.target)
-        
+
         return data[col_index].copy()
-    
-    def transform(self, data, drop = False):
+
+    def transform(self, data, drop=False):
         """
             transforms data frame with all operations, by default does not drop cols
         """
@@ -110,10 +107,8 @@ class DSetTransform:
         data_filtered = self.dropOtherFeats(data) if drop else data.copy()
 
         return pd.concat([data_filtered, data_cprob, data_ohe], 1)
-        
-        
-    
-    
+
+
 def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
     """
         replaces all features in the dataset with the
@@ -159,11 +154,11 @@ def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
             # actually apply transform
             series = series.apply(lambda x: colMap[x])
             rawData[colName] = series
-    
-    #rename columns modified
-    rawData.columns = [ (x if x == target or not featureMask[x] else "cprob_" + x) 
-                        for x in rawData.columns ]
-    
+
+    # rename columns modified
+    rawData.columns = [(x if x == target or not featureMask[x] else "cprob_" + x)
+                       for x in rawData.columns]
+
     return rawData, globalMap
 
 
@@ -195,7 +190,7 @@ def normalizeSize(data):
     # this is also an issue when using not(...), we need to use .apply(lambda v: not v) instead
     #   (even though bitwise and seems to work as well,
     #    we should test it works more rigurously and then it should be fine)
-    
+
     # note initial code renormalised values but we can write
     # normalised values here directly
     data.loc[(data.sizeCode == 'XS'), 'sizeCode'] = 0
@@ -203,37 +198,37 @@ def normalizeSize(data):
     data.loc[(data.sizeCode == 'M'), 'sizeCode'] = 2 / 4
     data.loc[(data.sizeCode == 'L'), 'sizeCode'] = 3 / 4
     data.loc[(data.sizeCode == 'XL'), 'sizeCode'] = 4 / 4
-    
+
     # get aux indexing and copy data
     notAorIindex = (data['sizeCode'] != 'A') & (data['sizeCode'] != 'I')
-    numericData = pd.to_numeric(data[notAorIindex]['sizeCode']) # pd.to_numeric automatically copies
-    
+    numericData = pd.to_numeric(data[notAorIindex]['sizeCode'])  # pd.to_numeric automatically copies
+
     # dropped 'sizeCode' indexing since numericData is now a single column
     # normalize 32-44
     numericData.loc[(numericData <= 44) & (numericData >= 32)] = \
         (numericData.loc[(numericData <= 44) & (numericData >= 32)] - 32.0) / (44.0 - 32.0)
-    
+
     # normalize 24-33
     numericData.loc[(numericData <= 33) & (numericData >= 24)] = \
         (numericData.loc[(numericData <= 33) & (numericData >= 24)] - 24.0) / (33.0 - 24.0)
-    
+
     # normalize 75-100
     numericData.loc[(numericData <= 100) & (numericData >= 75)] = \
         (numericData.loc[(numericData <= 100) & (numericData >= 75)] - 75.0) / (100.0 - 75.0)
-    
+
     # writeback numericData into original dataframe
     # maybe we can work with data.loc in-place as the original did?
     # that means we should filter 'A' and 'I' out somehow first, 
     # otherwise <= and >= don't work for indexing
     data.loc[notAorIindex, 'sizeCode'] = numericData
-    
+
     # set I and A to mean of the rest for the moment
     # apparently pandas complains about not(...) so I'm using the apply with lambda
     data.loc[notAorIindex.apply(lambda v: not v), 'sizeCode'] = data.loc[notAorIindex, 'sizeCode'].mean()
-    
+
     # maybe update directly only 'sizeCode' location in list? O(n) anyways for find.
-    data.columns = [ c if c != 'sizeCode' else 'normalisedSizeCode' for c in data.columns ]
-    
+    data.columns = [c if c != 'sizeCode' else 'normalisedSizeCode' for c in data.columns]
+
     return data
 
 
@@ -263,8 +258,8 @@ def constructWeekDayColumn(data):
 
 def performDateEngineering(rawData, dateColumn):
     data = constructWeekDayColumn(rawData)
-    data[dateColumn+'-month']= rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
-    data[dateColumn+'-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
+    data[dateColumn + '-month'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[1]))
+    data[dateColumn + '-day'] = rawData[dateColumn].map(lambda entryDate: float(entryDate.split("-")[2]))
     data = data.drop([dateColumn], 1)
 
     return data
@@ -274,7 +269,7 @@ def performOHEOnColumn(data, columnName):
     """
         warning: may mutate your input data. cached a copy if needed!
     """
-    
+
     # adding all the extra columns
     data = pd.concat([data, pd.get_dummies(data[columnName], prefix=columnName)], axis=1)
 
@@ -300,41 +295,42 @@ def printNumberOfCustomersSeen(trainData, testData):
     print("Percentage of already seen customers in test set: {}".format(seenCustomersNumber / totalTrainCustomer))
 
 
-def constructPercentageReturnColumn(trainData, testData ):
+def constructPercentageReturnColumn(trainData, testData):
     print("Constructing PercentageReturn feature....")
-        
-    printNumberOfCustomersSeen(trainData,testData)
-    
+
+    printNumberOfCustomersSeen(trainData, testData)
+
     # avoid chain indexing warning
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()
 
-    #construct the dictionary only on the information in the training set
+    # construct the dictionary only on the information in the training set
     dataByCustomer = trainDataCopy[['quantity', 'returnQuantity']].groupby(trainDataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
+        'quantity'].apply(lambda x: max(1, x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
-    #computing the average percentage across all customers
+    # computing the average percentage across all customers
     summedByCustomerDict = dataSummedByCustomer.to_dict().get('percentageReturned')
     percentagesList = list(summedByCustomerDict.values())
-    averagePercetangeOfReturn = sum(percentagesList)/float(len(percentagesList))
+    averagePercetangeOfReturn = sum(percentagesList) / float(len(percentagesList))
 
-    #if customer not found, the default percentage will be the average of percetages
+    # if customer not found, the default percentage will be the average of percetages
     idToPercDict = defaultdict(lambda: averagePercetangeOfReturn)
 
-    #append the other dictionary
+    # append the other dictionary
     idToPercDict.update(summedByCustomerDict)
 
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
     testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
 
-    return trainDataCopy,testDataCopy
+    return trainDataCopy, testDataCopy
 
-def constructCustomerMedianSizeAndColor(trainData,testData):
 
+def constructCustomerMedianSizeAndColor(trainData, testData):
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()
 
@@ -354,15 +350,14 @@ def constructCustomerMedianSizeAndColor(trainData,testData):
     idToSize.update(median.to_dict().get('normalisedSizeCode'))
     idToColor.update(median.to_dict().get('colorCode'))
 
-    #add new colums in the dataframes
+    # add new colums in the dataframes
     trainDataCopy.loc[:, 'customerMedianColor'] = trainDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     trainDataCopy.loc[:, 'customerMedianSize'] = trainDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
     testDataCopy.loc[:, 'customerMedianColor'] = testDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     testDataCopy.loc[:, 'customerMedianSize'] = testDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
-    return trainDataCopy,testDataCopy
-
+    return trainDataCopy, testDataCopy
 
 
 def constructItemPercentageReturnColumn(data):
@@ -374,7 +369,8 @@ def constructItemPercentageReturnColumn(data):
     dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['articleID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+    dataSummedByCustomer['itemPercentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
+        'quantity'].apply(lambda x: max(1, x))
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
     idToPercDict = dataSummedByCustomer.to_dict().get('itemPercentageReturned')
@@ -424,16 +420,89 @@ def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only
 
     finalData = data.join(newColumnsDataFrame)
 
-    #todo one extra row added at the end. weird. to investigate
+    # todo one extra row added at the end. weird. to investigate
     finalData = finalData.dropna()
 
     return finalData
+
+
+def constructOrderDuplicatesCountColumn(data):
+    print("Constructing order duplicates count feature")
+    dataCopy = data.copy()
+    # select only columns of interest - orderID and articleID
+    filtered = dataCopy.loc[:, ['orderID', 'articleID']]
+    # group by orderID
+    groupedByOrder = filtered.groupby('orderID')
+    # apply two aggregate functions - size -> number of instances in one order
+    # nunique ->  number of unique instances (i.e. unique articleIDs) in one order
+    aggregated = groupedByOrder.agg([np.size, pd.Series.nunique])
+    # difference between size and nunique will give us number of duplicate articleIDs in one order
+    aggregated['duplicates'] = aggregated.loc[:, ('articleID', 'size')] - aggregated.loc[:, ('articleID', 'nunique')]
+    finalFrame = aggregated.drop([('articleID', 'size'), ('articleID', 'nunique')], 1)
+    # turn the df into a dict with key = orderID, value = number of duplicates
+    dictDuplicatesCount = finalFrame.to_dict().get(('duplicates', ''))
+    # add a duplicates/order column in the original df, using the generated dict
+    dataCopy.loc[:, 'orderDuplicatesCount'] = data['orderID'].apply(lambda orderID: dictDuplicatesCount[orderID])
+    return dataCopy
+
+
+def contructOrderDuplicatesDistinctColorCountColumn(data):
+    print("Constructing order duplicate with distinct color count feature")
+    dataCopy = data.copy()
+    # select only the columns we need for the feature construction
+    filteredOrderArticle = dataCopy.loc[:, ['orderID', 'articleID', 'colorCode']]
+    # nested group by orderID and then by articleID
+    groupedByOrderArticle = filteredOrderArticle.groupby(['orderID', 'articleID'])
+    # get unique color code for each articleID in each order
+    aggregated = groupedByOrderArticle.agg([pd.Series.nunique])
+    # if nunique is 1, duplicateDistinctColor must be 0 (we either have non-duplicate article, hence 1 unique color,
+    # or duplicate article, with one unique color)
+    aggregated['duplicateDistinctColor'] = aggregated[('colorCode', 'nunique')].apply(lambda x: 0 if x == 1 else 1)
+    # reset indices - want to have orderID as column, not index, in order to perform yet another group by
+    aggregated.reset_index(inplace=True)
+    # drop unused columns - will have just orderID and count of unique color codes per article
+    final = aggregated.drop([('articleID', ''), ('colorCode', 'nunique')], axis=1)
+    # group again by order id
+    groupedByOrderFinal = final.groupby('orderID')
+    # sum up
+    finalDuplicateColors = groupedByOrderFinal.agg([np.sum], level=0)
+    duplicateWithDistinctColorDict = finalDuplicateColors.to_dict().get(('duplicateDistinctColor', '', 'sum'))
+    dataCopy['orderDuplicatesDistinctColorCount'] = dataCopy['orderID'].apply(
+        lambda orderId: duplicateWithDistinctColorDict.get(orderId))
+    return dataCopy
+
+
+def constructOrderDuplicatesDistinctSizeCountColumn(data):
+    print("Constructing order duplicate with distinct size count feature")
+    dataCopy = data.copy()
+    # select only the columns we need for the feature construction
+    filteredOrderArticle = dataCopy[['orderID', 'articleID', 'sizeCode']]
+    # nested group by orderID and then by articleID
+    groupedByOrderArticle = filteredOrderArticle.groupby(['orderID', 'articleID'])
+    # get unique size code for each articleID in each order
+    aggregated = groupedByOrderArticle.agg([pd.Series.nunique])
+    # if nunique is 1, duplicateDistinctColor must be 0 (we either have non-duplicate article, hence 1 unique size,
+    # or duplicate article, with one unique size)
+    aggregated['duplicateDistinctSize'] = aggregated[('sizeCode', 'nunique')].apply(lambda x: 0 if x == 1 else 1)
+    # reset indices - want to have orderID as column, not index, in order to perform yet another group by
+    aggregated.reset_index(inplace=True)
+    # drop unused columns - will have just orderID and count of unique size codes per article
+    final = aggregated.drop([('articleID', ''), ('sizeCode', 'nunique')], axis=1)
+    # group again by order id
+    groupedByOrderFinal = final.groupby('orderID')
+    # sum up
+    finalDuplicateSizes = groupedByOrderFinal.agg([np.sum], level=0)
+    duplicateWithDistinctSizeDict = finalDuplicateSizes.to_dict().get(('duplicateDistinctSize', '', 'sum'))
+    dataCopy['orderDuplicatesDistinctSizeCount'] = dataCopy['orderID'].apply(
+        lambda orderId: duplicateWithDistinctSizeDict.get(orderId))
+    return dataCopy
 
 
 def constructOverpricedColumn(data):
     data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
     return data
+
 
 def constructDiscountAmountColumn(data):
     data.loc[:, 'discountedAmount'] = data['voucherAmount'] / data['price'].apply(lambda pr: max(pr, 1))
@@ -447,16 +516,18 @@ def performColorCodeEngineering(data):
 
     return data
 
+
 def constructArticleIdSuffixColumn(data):
     data['articleIdSuffix'] = data['articleID'].apply(lambda id: int(id[4:]))
 
     return data
 
+
 def dropMissingValues(data):
     return data.dropna()
 
 
-def fillMissingValues(data, productGroupStategy = 'median', rrpStrategy = 'mean'):
+def fillMissingValues(data, productGroupStategy='median', rrpStrategy='mean'):
     """
     Fills the missing values in the columns which suffer from this.
     """
@@ -467,7 +538,7 @@ def fillMissingValues(data, productGroupStategy = 'median', rrpStrategy = 'mean'
     rrpImputer = Imputer(missing_values='NaN', strategy=rrpStrategy)
     data['rrp'] = rrpImputer.fit_transform(data['rrp'])
 
-    #for the voucher ID column, 6 values missing. drop them
+    # for the voucher ID column, 6 values missing. drop them
     data = dropMissingValues(data)
 
     return data
@@ -493,7 +564,7 @@ def selectKBest(xTrain, yTrain, k, columnNames):
     selector = SelectKBest(f_regression, k=k)  # k is number of features.
     newXTrain = selector.fit_transform(xTrain, yTrain)
 
-    #print the remaining features
+    # print the remaining features
     columnNames = [name for name in columnNames if name != 'returnQuantity']
 
     selectedColumnNames = np.array(columnNames)[selector.get_support()]
@@ -505,10 +576,10 @@ def selectKBest(xTrain, yTrain, k, columnNames):
     print("\nAfter Select K Best : Selected Features = {}".format(selectedColumnNames))
     # print("\nAfter Select K Best : Dismissed Features = {}".format(notSelectedColumnNames))
 
-    return newXTrain,selectedColumnNames
+    return newXTrain, selectedColumnNames
 
 
-def getXandYMatrix(data,predictionColumnName):
+def getXandYMatrix(data, predictionColumnName):
     """
     Being given a dataframe, it splits it's columns into X containing the training features and y being the prediciton feature
     """
@@ -516,7 +587,8 @@ def getXandYMatrix(data,predictionColumnName):
     X = data.ix[:, data.columns != predictionColumnName].values
     y = data[predictionColumnName].values
 
-    return X,y
+    return X, y
+
 
 def scaleMatrix(dataMatrix):
     """
@@ -525,7 +597,6 @@ def scaleMatrix(dataMatrix):
 
     scaler = StandardScaler()
     return scaler.fit_transform(dataMatrix)
-
 
 
 def performTrainTestSplit(data, test_size):
@@ -538,7 +609,7 @@ def performTrainTestSplit(data, test_size):
     """
 
     numberTraining = math.ceil(data.shape[0] * (1 - test_size))
-    trainData = data.iloc[0: numberTraining]
-    testData = data.iloc[numberTraining:]
+    trainData = data.iloc[0: int(numberTraining)]
+    testData = data.iloc[int(numberTraining):]
 
     return trainData, testData
