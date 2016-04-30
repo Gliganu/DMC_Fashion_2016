@@ -14,33 +14,39 @@ def addNewFeatures(data):
     data = Toolbox.constructDiscountAmountColumn(data)
 
     data = Toolbox.constructArticleIdSuffixColumn(data)
+    # data = data.drop(['articleID'],1)
 
     data = Toolbox.constructItemPercentageReturnColumn(data)
 
     data = Toolbox.constructBasketColumns(data)
+    # data = data.drop(['orderID'], 1)
 
     return data
 
 
 def engineerOldFeatures(data):
     data = Toolbox.performOHEOnColumn(data, 'deviceID')
+    # data = data.drop(['deviceID'],1)
 
     data = Toolbox.performOHEOnColumn(data, 'paymentMethod')
+    # data = data.drop(['paymentMethod'], 1)
 
     data = Toolbox.performSizeCodeEngineering(data)
+    # data = data.drop(['sizeCode'], 1)
 
-    data = Toolbox.performColorCodeEngineering(data)
+    # data = Toolbox.performColorCodeEngineering(data)
 
     data = Toolbox.performDateEngineering(data, 'orderDate')
+    # data = data.drop(['orderDate'], 1)
 
     return data
 
 def makePrediction():
     print("Reading data...")
 
-    # data = FileManager.getRandomTrainingData(500000)
+    data = FileManager.getRandomTrainingData(100000)
     # data = FileManager.get10kTrainingData()
-    data = FileManager.getWholeTrainingData()
+    # data = FileManager.getWholeTrainingData()
 
     keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
@@ -60,17 +66,20 @@ def makePrediction():
     # Perform feature engineering on existing features
     data = engineerOldFeatures(data)
 
+    #TODO only for debugging purposes
+    # data = Toolbox.constructBadPercentageReturnColumn(data)
+
     # Construct polynomial features
-    polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced',
-                'discountedAmount']
-    # polynomialFeaturesSourceColumns = data.columns
-    data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
+    # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
+    # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
 
     #Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
 
     #construct the percentage return column
     # trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
+
+    #consturct median color/size per customer + difference
     trainData,testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
@@ -80,7 +89,6 @@ def makePrediction():
 
     #X and Y train
     xTrain,yTrain = Toolbox.getXandYMatrix(trainData,'returnQuantity')
-    # xTrain = Toolbox.scaleMatrix(xTrain)
 
     #Select K best features according to variance
     # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, trainData.columns)
@@ -88,7 +96,16 @@ def makePrediction():
 
     # X and Y test
     xTest, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
-    # xTest = Toolbox.scaleMatrix(xTest)
+
+
+    # xTrain = Toolbox.normalize(xTrain)
+    # xTest = Toolbox.normalize(xTest)
+
+    #apply PCA
+    # xTrain,xTest = Toolbox.performPCA(xTrain,xTest,10)
+
+    # apply RMB Transform ( + normalize and binarize )
+    # xTrain,xTest = Toolbox.performRBMTransform(xTrain,xTest)
 
     #Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)

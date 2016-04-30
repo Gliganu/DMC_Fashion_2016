@@ -7,8 +7,10 @@ from datetime import datetime
 from collections import defaultdict
 from copy import copy
 from sklearn.cross_validation import train_test_split
-from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer
 from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.decomposition import PCA
+from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
 
 
@@ -330,6 +332,28 @@ def constructPercentageReturnColumn(trainData, testData):
     return trainDataCopy, testDataCopy
 
 
+def constructBadPercentageReturnColumn(data):
+    """DO NOT USE! It's the old bad percentage return which gives us optimistic results"""
+    print("Constructing PercentageReturn feature....")
+
+    # avoid chain indexing warning
+    dataCopy = data.copy()
+
+    dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
+
+    dataSummedByCustomer = dataByCustomer.apply(sum)
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+
+    dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
+
+    idToPercDict = dataSummedByCustomer.to_dict().get('percentageReturned')
+
+    dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
+
+    return dataCopy
+
+
+
 def constructCustomerMedianSizeAndColor(trainData, testData):
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()
@@ -350,12 +374,20 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
     idToSize.update(median.to_dict().get('normalisedSizeCode'))
     idToColor.update(median.to_dict().get('colorCode'))
 
-    # add new colums in the dataframes
+    #add new colums in the dataframes representing what color/size the customer usually buys
     trainDataCopy.loc[:, 'customerMedianColor'] = trainDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     trainDataCopy.loc[:, 'customerMedianSize'] = trainDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
     testDataCopy.loc[:, 'customerMedianColor'] = testDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     testDataCopy.loc[:, 'customerMedianSize'] = testDataCopy['customerID'].apply(lambda custId: idToColor[custId])
+
+
+    #difference between what he bought now and what he normally buys
+    trainDataCopy.loc[:, 'colorDifference'] = abs(trainDataCopy['customerMedianColor'] - trainDataCopy['colorCode'])
+    trainDataCopy.loc[:, 'sizeDifference'] = abs(trainDataCopy['customerMedianSize'] - trainDataCopy['normalisedSizeCode'])
+
+    testDataCopy.loc[:, 'colorDifference'] = abs(testDataCopy['customerMedianColor'] - testDataCopy['colorCode'])
+    testDataCopy.loc[:, 'sizeDifference'] = abs(testDataCopy['customerMedianSize'] - testDataCopy['normalisedSizeCode'])
 
     return trainDataCopy, testDataCopy
 
@@ -598,6 +630,23 @@ def scaleMatrix(dataMatrix):
     scaler = StandardScaler()
     return scaler.fit_transform(dataMatrix)
 
+def normalizeMatrix(dataMatrix):
+    """
+    Normalizes all the columns in the matrix
+    """
+    return normalize(dataMatrix)
+
+
+def binarizeMatrix(dataMatrix, threshold):
+    """
+    Transforms all the inputs to either 0/1 . <0 Maps to 0. >1 Maps 1. [0,1] depends on the threshold you set between [0,1]
+    """
+
+    binarizer = Binarizer(threshold = threshold)
+
+    dataMatrix = binarizer.fit_transform(dataMatrix)
+
+    return dataMatrix
 
 def performTrainTestSplit(data, test_size):
     """
@@ -613,3 +662,37 @@ def performTrainTestSplit(data, test_size):
     testData = data.iloc[int(numberTraining):]
 
     return trainData, testData
+
+
+def performPCA(xTrain, xTest, numberComponents):
+
+    print("Performing PCA...")
+
+    pca = PCA(n_components = numberComponents)
+
+    pca = pca.fit(xTrain)
+
+    xTrain = pca.transform(xTrain)
+    xTest = pca.transform(xTest)
+
+    return xTrain, xTest
+
+
+def performRBMTransform(xTrain, xTest):
+
+    print("Performing RMB...")
+
+    xTrain = normalize(xTrain)
+    xTest = normalize(xTest)
+
+    # xTrain = binarizeMatrix(xTrain,0.5)
+    # xTest = binarizeMatrix(xTest,0.5)
+
+    rmb = BernoulliRBM(verbose = True)
+
+    rmb = rmb.fit(xTrain)
+
+    xTrain = rmb.transform(xTrain)
+    xTest = rmb.transform(xTest)
+
+    return xTrain, xTest
