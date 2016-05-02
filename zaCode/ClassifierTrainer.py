@@ -41,11 +41,26 @@ def trainRandomForestClassifier(xTrain, yTrain):
 
 def trainGradientBoostingClassifier(xTrain, yTrain):
 
-    # n_estimators = 120, learning_rate = 0.07
+    n_estimators = 150
+    learning_rate = 0.05
+    max_depth = 4
+    max_features = 0.3
+    min_samples_leaf = 5
+
     # max_features= 0.5, max_depth= 6
     # subsample = 0.9
-    classifier = GradientBoostingClassifier(n_estimators=120,max_depth=6,min_samples_leaf=1,learning_rate=0.07,max_features=0.5, verbose=1)
-    # classifier = GradientBoostingClassifier(verbose=1)
+    #  max_depth = 6, min_samples_leaf = 1, max_features = 0.5
+
+
+    # classifier = GradientBoostingClassifier(n_estimators=n_estimators,learning_rate=learning_rate,max_depth = 6, min_samples_leaf = 1, max_features = 0.5, verbose=1)
+    classifier = GradientBoostingClassifier(n_estimators=n_estimators,learning_rate=learning_rate,max_depth=max_depth,max_features=max_features, min_samples_leaf=min_samples_leaf, verbose=1)
+
+
+    # paramGrid = {
+    #     "min_samples_leaf":[1,3,5,7],
+    # }
+    # classifier = trainUsingGridSearch(classifier,paramGrid,xTrain,yTrain)
+
 
     classifier.fit(xTrain, yTrain)
 
@@ -66,7 +81,7 @@ def trainUsingGridSearch(classifier, paramGrid, xTrain, yTrain):
 
     cv = StratifiedKFold(yTrain,n_folds=3)
 
-    newClassifier = GridSearchCV(classifier, scoring="accuracy", param_grid=paramGrid, cv=cv, n_jobs=-1, verbose=1)
+    newClassifier = GridSearchCV(classifier, scoring="f1", param_grid=paramGrid, cv=cv, n_jobs=-1, verbose=1)
 
     newClassifier.fit(xTrain, yTrain)
 

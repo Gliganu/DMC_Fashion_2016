@@ -13,6 +13,12 @@ def addNewFeatures(data):
 
     data = Toolbox.constructDiscountAmountColumn(data)
 
+    data = Toolbox.constructOrderDuplicatesCountColumn(data)
+
+    data = Toolbox.contructOrderDuplicatesDistinctColorCountColumn(data)
+
+    data = Toolbox.constructOrderDuplicatesDistinctSizeCountColumn(data)
+
     data = Toolbox.constructArticleIdSuffixColumn(data)
     # data = data.drop(['articleID'],1)
 
@@ -25,10 +31,10 @@ def addNewFeatures(data):
 
 
 def engineerOldFeatures(data):
-    data = Toolbox.performOHEOnColumn(data, 'deviceID')
+    data = Toolbox.performOHEOnColumn(data, 'deviceID',False)
     # data = data.drop(['deviceID'],1)
 
-    data = Toolbox.performOHEOnColumn(data, 'paymentMethod')
+    data = Toolbox.performOHEOnColumn(data, 'paymentMethod',False)
     # data = data.drop(['paymentMethod'], 1)
 
     data = Toolbox.performSizeCodeEngineering(data)
@@ -44,11 +50,11 @@ def engineerOldFeatures(data):
 def makePrediction():
     print("Reading data...")
 
-    data = FileManager.getRandomTrainingData(100000)
+    # data = FileManager.getRandomTrainingData(50000)
     # data = FileManager.get10kTrainingData()
-    # data = FileManager.getWholeTrainingData()
+    data = FileManager.getWholeTrainingData()
 
-    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
+    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod','productGroup',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
 
     # Keep just the columns of interest
@@ -77,7 +83,9 @@ def makePrediction():
     trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
 
     #construct the percentage return column
-    # trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
+    trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData,n_clusters= 150)
+    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'],1)
+    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'],1)
 
     #consturct median color/size per customer + difference
     trainData,testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
@@ -115,7 +123,7 @@ def makePrediction():
 
     #Assessing the performance
     Validator.performValidation(yPred, yTest)
-    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+    # Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
 
 
 if __name__ == '__main__':
