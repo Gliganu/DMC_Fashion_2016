@@ -15,9 +15,9 @@ def addNewFeatures(data):
 
     data = Toolbox.constructOrderDuplicatesCountColumn(data)
 
-    data = Toolbox.contructOrderDuplicatesDistinctColorCountColumn(data)
+    data = Toolbox.contructOrderDuplicatesDistinctColorColumn(data)
 
-    data = Toolbox.constructOrderDuplicatesDistinctSizeCountColumn(data)
+    data = Toolbox.constructOrderDuplicatesDistinctSizeColumn(data)
 
     data = Toolbox.constructArticleIdSuffixColumn(data)
     # data = data.drop(['articleID'],1)
