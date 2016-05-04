@@ -30,6 +30,31 @@ class DSetTransform:
         self.feats_condprob = feats_condprob
         self.target = target
 
+    def periodic_partition(self, data, fraction):
+        """
+        Partitions dataset by selection periodic samples from timeseries
+        :param data:
+        :param fraction: fraction of data (in range [0, 1])
+        :return: Single data frame containing selected subset
+        """
+
+        final_cnt = int(len(data) * fraction)
+        print("selecting {} items from data".format(final_cnt))
+
+        cnt = 0
+
+        retval = pd.DataFrame(columns = data.columns)
+        indicator = int(1.0 / fraction)
+        for idx, vals in data.iterrows():
+            if cnt % indicator == 0:
+                retval.loc[idx, :] = vals
+            cnt += 1
+
+            if cnt % 20000 == 0:
+                print("done with iteration number {}".format(cnt))
+
+        return retval
+
     def partition(self, data, fraction):
         """ partitions dataset into two sets, containing fraction and 1-fraction 
             percentages of the data.
@@ -42,14 +67,25 @@ class DSetTransform:
         A = pd.DataFrame(columns=data.columns)
         B = pd.DataFrame(columns=data.columns)
 
-        for idx in data.index:
 
-            if random.random() < fraction:
+        cnt = 0
+        decision = False
+        #take 10 products at a time to speedup subsampling
+
+        for idx in data.index:
+            if cnt % 5 == 0:
+                decision = random.random() < fraction
+
+            if decision:
                 for cname, series in data.iteritems():
                     A.loc[idx, cname] = series[idx]
             else:
                 for cname, series in data.iteritems():
                     B.loc[idx, cname] = series[idx]
+
+            cnt += 1
+            if cnt % 5000 == 0:
+                print("processed {} rows".format(cnt))
 
         return A, B
 
