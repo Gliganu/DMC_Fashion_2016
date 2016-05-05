@@ -70,12 +70,12 @@ class ProbEngine:
         cv = self.global_cov()
         return cv.mahalanobis(row)
 
-    def add_mh_feats(self, other_data):
+    def add_all_mh(self, other_data):
         """
         adds mahalanobis distance to robust and global cvmat, mean params estimated
         from target dataset to other_data
         :param other_data: data set to add features to
-        :return: other_data, with additionat features (other_data is mutated)
+        :return: other_data, with additional features
         """
         print("estimating covariances...")
 
@@ -89,22 +89,34 @@ class ProbEngine:
         print("data to fill in with features has {} rows".format(len(other_data)))
         print("starting to add features...")
 
-        cnt = 0
-        for idx, vals in other_data.iterrows():
-            other_data.loc[idx, "robust_MhlDist"] = rb_cv.mahalanobis(vals)
-            other_data.loc[idx, "global_MhlDist"] = gb_cv.mahalanobis(vals)
+        ret = copy(other_data)
+        ret['robust_MhlDist'] = rb_cv.mahalanobis(other_data)
+        ret['global_MhlDist'] = gb_cv.mahalanobis(other_data)
+        return ret
 
-            cnt += 1
-            if cnt % 20000 == 0:
-                print("just passed row {}...".format(cnt))
+    def add_global_mh(self, other_data):
+        """
+        like add_all_mh but adds only feature based on global covariance
+        :param other_data:
+        :return:other_data, with additional features
+        """
+        
+        gb_cv = self.global_cov()
+        ret = copy(other_data)
+        ret['global_MhlDist'] = gb_cv.mahalanobis(other_data)
+        return ret
 
-        return other_data
+    def add_robust_mh(self, other_data):
+        """
+        like add_all_mh but adds only feature based on robust covariance
+        :param other_data:
+        :return:other_data, with additional features
+        """
 
-        
-        
-        
-        
-        
+        rb_cv = self.robust_cov()
+        ret = copy(other_data)
+        ret['robust_MhlDist'] = rb_cv.mahalnobis(other_data)
+        return ret
 
 
 
