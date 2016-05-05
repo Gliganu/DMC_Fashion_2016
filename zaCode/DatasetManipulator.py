@@ -7,12 +7,13 @@ from datetime import datetime
 from collections import defaultdict
 from copy import copy
 from sklearn.cross_validation import train_test_split
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer,LabelEncoder
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, MinMaxScaler
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.decomposition import PCA
 from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
-
+from sklearn.cluster import KMeans
 
 class DSetTransform:
     """ Class Transforms a  by dropping or replacing features and partitioning data set
@@ -30,6 +31,31 @@ class DSetTransform:
         self.feats_condprob = feats_condprob
         self.target = target
 
+    def periodic_partition(self, data, fraction):
+        """
+        Partitions dataset by selection periodic samples from timeseries
+        :param data:
+        :param fraction: fraction of data (in range [0, 1])
+        :return: Single data frame containing selected subset
+        """
+
+        final_cnt = int(len(data) * fraction)
+        print("selecting {} items from data".format(final_cnt))
+
+        cnt = 0
+
+        retval = pd.DataFrame(columns = data.columns)
+        indicator = int(1.0 / fraction)
+        for idx, vals in data.iterrows():
+            if cnt % indicator == 0:
+                retval.loc[idx, :] = vals
+            cnt += 1
+
+            if cnt % 20000 == 0:
+                print("done with iteration number {}".format(cnt))
+
+        return retval
+
     def partition(self, data, fraction):
         """ partitions dataset into two sets, containing fraction and 1-fraction 
             percentages of the data.
@@ -42,14 +68,25 @@ class DSetTransform:
         A = pd.DataFrame(columns=data.columns)
         B = pd.DataFrame(columns=data.columns)
 
-        for idx in data.index:
 
-            if random.random() < fraction:
+        cnt = 0
+        decision = False
+        #take 10 products at a time to speedup subsampling
+
+        for idx in data.index:
+            if cnt % 5 == 0:
+                decision = random.random() < fraction
+
+            if decision:
                 for cname, series in data.iteritems():
                     A.loc[idx, cname] = series[idx]
             else:
                 for cname, series in data.iteritems():
                     B.loc[idx, cname] = series[idx]
+
+            cnt += 1
+            if cnt % 5000 == 0:
+                print("processed {} rows".format(cnt))
 
         return A, B
 
@@ -267,7 +304,7 @@ def performDateEngineering(rawData, dateColumn):
     return data
 
 
-def performOHEOnColumn(data, columnName):
+def performOHEOnColumn(data, columnName, withRemoval = True):
     """
         warning: may mutate your input data. cached a copy if needed!
     """
@@ -276,7 +313,8 @@ def performOHEOnColumn(data, columnName):
     data = pd.concat([data, pd.get_dummies(data[columnName], prefix=columnName)], axis=1)
 
     # dropping the "source" column
-    data = data.drop([columnName], 1)
+    if withRemoval:
+        data = data.drop([columnName], 1)
 
     return data
 
@@ -296,15 +334,26 @@ def printNumberOfCustomersSeen(trainData, testData):
 
     print("Percentage of already seen customers in test set: {}".format(seenCustomersNumber / totalTrainCustomer))
 
+def getCustomerClusteringDataFrame(data):
 
-def constructPercentageReturnColumn(trainData, testData):
-    print("Constructing PercentageReturn feature....")
+    medianColumns = ['colorCode','productGroup','deviceID','paymentMethod']
+    meanColumns = ['normalisedSizeCode','price','rrp','quantity']
 
-    printNumberOfCustomersSeen(trainData, testData)
+    medianData = data[medianColumns].groupby(data['customerID'])
+    meanData = data[meanColumns].groupby(data['customerID'])
+
+    dataMedianByCustomer = medianData.median()
+    dataMeanByCustomer = meanData.mean()
+
+    clusteringTrainData = dataMedianByCustomer.join(dataMeanByCustomer)
+
+    return clusteringTrainData
+
+def getKnownCustomerIDToPercentageReturnDict(trainData):
+    print("Constructing Known Customer ID To Percentage Reteturned ....")
 
     # avoid chain indexing warning
     trainDataCopy = trainData.copy()
-    testDataCopy = testData.copy()
 
     # construct the dictionary only on the information in the training set
     dataByCustomer = trainDataCopy[['quantity', 'returnQuantity']].groupby(trainDataCopy['customerID'])
@@ -315,22 +364,94 @@ def constructPercentageReturnColumn(trainData, testData):
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
-    # computing the average percentage across all customers
-    summedByCustomerDict = dataSummedByCustomer.to_dict().get('percentageReturned')
-    percentagesList = list(summedByCustomerDict.values())
-    averagePercetangeOfReturn = sum(percentagesList) / float(len(percentagesList))
+    customerIDtoPercentageReturnDict = dataSummedByCustomer.to_dict().get('percentageReturned')
 
-    # if customer not found, the default percentage will be the average of percetages
-    idToPercDict = defaultdict(lambda: averagePercetangeOfReturn)
+    return customerIDtoPercentageReturnDict
 
-    # append the other dictionary
-    idToPercDict.update(summedByCustomerDict)
+def getFullCustomerIDToPercentageReturnDict(clusteringTrainData,clusteringTestData,knownCustomerIdToPercentageReturnDict,n_clusters):
 
-    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
+    print("Clustering customers....")
 
-    return trainDataCopy, testDataCopy
+    # compute the clusters based on the training data
+    clusteringTrainDataValues = clusteringTrainData.values
+    testDataCopy = clusteringTestData.copy()
 
+
+    kMeans = KMeans(n_clusters=n_clusters)
+    kMeans.fit(clusteringTrainDataValues)
+    labels = kMeans.labels_
+
+    #append the cluster index column to the dataframe
+    trainDataCopy = clusteringTrainData.copy()
+    trainDataCopy.loc[:, 'clusterIndex'] = labels
+
+
+    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map((lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
+
+
+    clusterLabelToPercentageReturnDict = {}
+
+    #for each cluster, compute it's percentage return average based on the percReturn of the train data
+    for i in range(n_clusters):
+        customersInCluster = trainDataCopy[trainDataCopy['clusterIndex'] == i]
+        average = customersInCluster['percentageReturned'].mean()
+        clusterLabelToPercentageReturnDict[i] = average
+
+
+    print("Predicting clusters for customers....")
+
+    #todo for already seen customers do NOT predict !
+
+    #predict in which cluster the entries in the test data will be
+    predictedTestLabels = kMeans.predict(testDataCopy)
+    testDataCopy.loc[:, 'clusterIndex'] = predictedTestLabels
+
+    #set the percReturn of that entry to the mean of that belonging cluster
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['clusterIndex'].apply(lambda clusterIndex: clusterLabelToPercentageReturnDict[clusterIndex])
+
+
+    testCustomerIdToPercentageReturnDict = testDataCopy.to_dict().get('percentageReturned')
+
+    #merge the 2 dictionaries
+    knownCustomerIdToPercentageReturnDict.update(testCustomerIdToPercentageReturnDict)
+
+    return knownCustomerIdToPercentageReturnDict
+
+
+def constructPercentageReturnColumn(trainData,testData,n_clusters):
+
+    print("Constructing Percetange Return Column....")
+
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+
+    #labelize the previously OHEed features
+    paymendEncoder = LabelEncoder()
+    deviceEncoder = LabelEncoder()
+
+    paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'],testDataCopy['paymentMethod']))
+    deviceEncoder.fit(np.append(trainDataCopy['deviceID'],testDataCopy['deviceID']))
+
+    trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
+    testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
+
+    trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
+    testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
+
+
+    clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
+    clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
+
+    knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
+
+    fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
+                                                                                    clusteringTestData,
+                                                                                    knownCustomerIdToPercentageReturnDict,n_clusters)
+
+    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+
+    return trainDataCopy,testDataCopy
 
 def constructBadPercentageReturnColumn(data):
     """DO NOT USE! It's the old bad percentage return which gives us optimistic results"""
@@ -342,8 +463,7 @@ def constructBadPercentageReturnColumn(data):
     dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
-        'quantity'].apply(lambda x: max(1, x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 

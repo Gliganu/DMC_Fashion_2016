@@ -22,6 +22,7 @@ def makePrediction(keptColumns):
     Validator.performValidation(yPred, yTest)
 
 
+
 if __name__ == '__main__':
     startTime = time.time()
 
