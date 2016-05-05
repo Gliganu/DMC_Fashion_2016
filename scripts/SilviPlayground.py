@@ -1,5 +1,4 @@
 import time
-
 import zaCode.ClassifierTrainer as ClassifierTrainer
 import zaCode.DatasetManipulator as Toolbox
 import zaCode.FileManager as FileManager
@@ -8,6 +7,8 @@ from zaCode import Visualizer
 
 
 def addNewFeatures(data):
+    data = Toolbox.constructOrderNumberColumn(data)
+
     data = Toolbox.constructOrderDuplicatesCountColumn(data)
 
     data = Toolbox.contructOrderDuplicatesDistinctColorColumn(data)
@@ -40,6 +41,7 @@ def engineerOldFeatures(data):
 
     return data
 
+
 def makePrediction():
     print("Reading data...")
 
@@ -66,28 +68,28 @@ def makePrediction():
     data = engineerOldFeatures(data)
 
     # Construct polynomial features
-    polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced',
-                'discountedAmount']
+    # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced',
+    #            'discountedAmount']
     # polynomialFeaturesSourceColumns = data.columns
-    data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns, degree=2, interaction_only=False)
+    # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns, degree=2, interaction_only=False)
 
-    #Split into train/test data
-    trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
+    # Split into train/test data
+    trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
-    #construct the percentage return column
-    trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData )
-    trainData,testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
+    # construct the percentage return column
+    trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData)
+    trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
     testData = testData.drop(['customerID'], 1)
 
-    print("\n\nFinal columns {} : {}".format(len(trainData.columns),trainData.columns))
+    print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
 
-    #X and Y train
-    xTrain,yTrain = Toolbox.getXandYMatrix(trainData,'returnQuantity')
+    # X and Y train
+    xTrain, yTrain = Toolbox.getXandYMatrix(trainData, 'returnQuantity')
     # xTrain = Toolbox.scaleMatrix(xTrain)
 
-    #Select K best features according to variance
+    # Select K best features according to variance
     # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, trainData.columns)
     # testData = testData[selectedColumns].copy()
 
@@ -95,15 +97,16 @@ def makePrediction():
     xTest, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
     # xTest = Toolbox.scaleMatrix(xTest)
 
-    #Training the classifier
+    # Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
-    #Predicting
+    # Predicting
     yPred = classifier.predict(xTest)
 
-    #Assessing the performance
+    # Assessing the performance
     Validator.performValidation(yPred, yTest)
-    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,
+                                     [col for col in trainData.columns if col != 'returnQuantity'])
 
 
 if __name__ == '__main__':

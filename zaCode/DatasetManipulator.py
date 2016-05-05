@@ -7,7 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 from copy import copy
 from sklearn.cross_validation import train_test_split
-from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, MinMaxScaler
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.decomposition import PCA
 from sklearn.neural_network.rbm import BernoulliRBM
@@ -342,7 +342,8 @@ def constructBadPercentageReturnColumn(data):
     dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
+        'quantity'].apply(lambda x: max(1, x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
@@ -352,6 +353,31 @@ def constructBadPercentageReturnColumn(data):
 
     return dataCopy
 
+
+def scaleColumn(trainData, testData, columnName):
+    colTrain = trainData[columnName].values.astype(float)
+    colTest = testData[columnName].values.astype(float)
+    scaler = StandardScaler()
+    colTrainScaled = scaler.fit_transform(colTrain.reshape(-1, 1))
+    colTestScaled = scaler.transform(colTest.reshape(-1, 1))
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+    trainDataCopy.loc[:, [columnName]] = colTrainScaled
+    testDataCopy.loc[:, [columnName]] = colTestScaled
+    return (trainDataCopy, testDataCopy)
+
+
+def normalizeColumn(trainData, testData, columnName):
+    colTrain = trainData[columnName].values.astype(float)
+    colTest = testData[columnName].values.astype(float)
+    scaler = MinMaxScaler()
+    colTrainScaled = scaler.fit_transform(colTrain.reshape(-1, 1))
+    colTestScaled = scaler.transform(colTest.reshape(-1, 1))
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+    trainDataCopy.loc[:, [columnName]] = colTrainScaled
+    testDataCopy.loc[:, [columnName]] = colTestScaled
+    return (trainDataCopy, testDataCopy)
 
 
 def constructCustomerMedianSizeAndColor(trainData, testData):
@@ -374,17 +400,17 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
     idToSize.update(median.to_dict().get('normalisedSizeCode'))
     idToColor.update(median.to_dict().get('colorCode'))
 
-    #add new colums in the dataframes representing what color/size the customer usually buys
+    # add new colums in the dataframes representing what color/size the customer usually buys
     trainDataCopy.loc[:, 'customerMedianColor'] = trainDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     trainDataCopy.loc[:, 'customerMedianSize'] = trainDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
     testDataCopy.loc[:, 'customerMedianColor'] = testDataCopy['customerID'].apply(lambda custId: idToSize[custId])
     testDataCopy.loc[:, 'customerMedianSize'] = testDataCopy['customerID'].apply(lambda custId: idToColor[custId])
 
-
-    #difference between what he bought now and what he normally buys
+    # difference between what he bought now and what he normally buys
     trainDataCopy.loc[:, 'colorDifference'] = abs(trainDataCopy['customerMedianColor'] - trainDataCopy['colorCode'])
-    trainDataCopy.loc[:, 'sizeDifference'] = abs(trainDataCopy['customerMedianSize'] - trainDataCopy['normalisedSizeCode'])
+    trainDataCopy.loc[:, 'sizeDifference'] = abs(
+        trainDataCopy['customerMedianSize'] - trainDataCopy['normalisedSizeCode'])
 
     testDataCopy.loc[:, 'colorDifference'] = abs(testDataCopy['customerMedianColor'] - testDataCopy['colorCode'])
     testDataCopy.loc[:, 'sizeDifference'] = abs(testDataCopy['customerMedianSize'] - testDataCopy['normalisedSizeCode'])
@@ -459,7 +485,10 @@ def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only
 
 
 def constructOrderDuplicatesCountColumn(data):
-    print("Constructing order duplicates count feature")
+    """
+    Creates a column with number of duplicate article ids for each order
+    """
+    print("Constructing order duplicates count feature...")
     dataCopy = data.copy()
     # select only columns of interest - orderID and articleID
     filtered = dataCopy.loc[:, ['orderID', 'articleID']]
@@ -479,7 +508,11 @@ def constructOrderDuplicatesCountColumn(data):
 
 
 def contructOrderDuplicatesDistinctColorColumn(data):
-    print("Constructing order duplicate with distinct color count feature")
+    """
+    Construct a column which is true for a row if the article id is duplicate in the given order and if the colors
+    of the duplicates are distinct
+    """
+    print("Constructing order duplicate with distinct color count feature...")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
     filteredOrderArticle = dataCopy.loc[:, ['orderID', 'articleID', 'colorCode']]
@@ -498,7 +531,11 @@ def contructOrderDuplicatesDistinctColorColumn(data):
 
 
 def constructOrderDuplicatesDistinctSizeColumn(data):
-    print("Constructing order duplicate with distinct size count feature")
+    """
+    Construct a column which is true for a row if the article id is duplicate in the given order and if the sizes
+    of the duplicates are distinct
+    """
+    print("Constructing order duplicate with distinct size count feature...")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
     filteredOrderArticle = dataCopy[['orderID', 'articleID', 'sizeCode']]
@@ -538,6 +575,22 @@ def constructArticleIdSuffixColumn(data):
     data['articleIdSuffix'] = data['articleID'].apply(lambda id: int(id[4:]))
 
     return data
+
+
+def constructOrderNumberColumn(data):
+    print("Constructing order number feature...")
+    # remove order duplicates, we want each orderID to appear only once
+    dataNew = data.drop_duplicates('orderID')
+    groupedByCustomer = dataNew.loc[:, ['customerID', 'orderID']].groupby('customerID')
+    dict_order_number = {}
+    for name, group in groupedByCustomer:
+        count = 0
+        for index, row in group.iterrows():
+            dict_order_number[row['orderID']] = count
+            count += 1
+    dataCopy = data.copy()
+    dataCopy['orderNumber'] = data['orderID'].apply(lambda id: dict_order_number[id])
+    return dataCopy
 
 
 def dropMissingValues(data):
@@ -607,13 +660,16 @@ def getXandYMatrix(data, predictionColumnName):
     return X, y
 
 
-def scaleMatrix(dataMatrix):
+def scaleMatrix(trainMatrix, testMatrix):
     """
     Scales all the columns in the matrix
     """
 
     scaler = StandardScaler()
-    return scaler.fit_transform(dataMatrix)
+    trainScaled = scaler.fit_transform(trainMatrix)
+    testScaled = scaler.transform(testMatrix)
+    return trainScaled, testScaled
+
 
 def normalizeMatrix(dataMatrix):
     """
@@ -627,11 +683,12 @@ def binarizeMatrix(dataMatrix, threshold):
     Transforms all the inputs to either 0/1 . <0 Maps to 0. >1 Maps 1. [0,1] depends on the threshold you set between [0,1]
     """
 
-    binarizer = Binarizer(threshold = threshold)
+    binarizer = Binarizer(threshold=threshold)
 
     dataMatrix = binarizer.fit_transform(dataMatrix)
 
     return dataMatrix
+
 
 def performTrainTestSplit(data, test_size):
     """
@@ -650,10 +707,9 @@ def performTrainTestSplit(data, test_size):
 
 
 def performPCA(xTrain, xTest, numberComponents):
-
     print("Performing PCA...")
 
-    pca = PCA(n_components = numberComponents)
+    pca = PCA(n_components=numberComponents)
 
     pca = pca.fit(xTrain)
 
@@ -664,7 +720,6 @@ def performPCA(xTrain, xTest, numberComponents):
 
 
 def performRBMTransform(xTrain, xTest):
-
     print("Performing RMB...")
 
     xTrain = normalize(xTrain)
@@ -673,7 +728,7 @@ def performRBMTransform(xTrain, xTest):
     # xTrain = binarizeMatrix(xTrain,0.5)
     # xTest = binarizeMatrix(xTest,0.5)
 
-    rmb = BernoulliRBM(verbose = True)
+    rmb = BernoulliRBM(verbose=True)
 
     rmb = rmb.fit(xTrain)
 
