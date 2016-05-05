@@ -1,5 +1,7 @@
 import pandas as pd
 from sklearn.cross_validation import train_test_split
+from sklearn.externals import joblib
+import os
 
 def getWholeTrainingData():
     inputFileName = '../data/orders_train.txt'
@@ -57,3 +59,11 @@ def get1000kTrainingData():
     data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
 
     return data
+
+def saveModel(classifier, foldername, filename):
+    if not os.path.exists('../models/' + foldername):
+        os.makedirs('../models/' + foldername)
+    joblib.dump(classifier, '../models/' + foldername + '/' + filename)
+
+def loadModel(foldername, filename):
+    return joblib.load('../models/' + foldername + '/' + filename)

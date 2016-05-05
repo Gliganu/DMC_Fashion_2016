@@ -8,16 +8,15 @@ from zaCode import Visualizer
 
 
 def addNewFeatures(data):
-
     data = Toolbox.constructOverpricedColumn(data)
 
     data = Toolbox.constructDiscountAmountColumn(data)
 
     data = Toolbox.constructOrderDuplicatesCountColumn(data)
 
-    data = Toolbox.contructOrderDuplicatesDistinctColorCountColumn(data)
+    data = Toolbox.contructOrderDuplicatesDistinctColorColumn(data)
 
-    data = Toolbox.constructOrderDuplicatesDistinctSizeCountColumn(data)
+    data = Toolbox.constructOrderDuplicatesDistinctSizeColumn(data)
 
     data = Toolbox.constructArticleIdSuffixColumn(data)
     # data = data.drop(['articleID'],1)
@@ -31,10 +30,10 @@ def addNewFeatures(data):
 
 
 def engineerOldFeatures(data):
-    data = Toolbox.performOHEOnColumn(data, 'deviceID',False)
+    data = Toolbox.performOHEOnColumn(data, 'deviceID', False)
     # data = data.drop(['deviceID'],1)
 
-    data = Toolbox.performOHEOnColumn(data, 'paymentMethod',False)
+    data = Toolbox.performOHEOnColumn(data, 'paymentMethod', False)
     # data = data.drop(['paymentMethod'], 1)
 
     data = Toolbox.performSizeCodeEngineering(data)
@@ -47,14 +46,16 @@ def engineerOldFeatures(data):
 
     return data
 
+
 def makePrediction():
     print("Reading data...")
 
-    # data = FileManager.getRandomTrainingData(50000)
+    data = FileManager.getRandomTrainingData(50000)
     # data = FileManager.get10kTrainingData()
-    data = FileManager.getWholeTrainingData()
+    # data = FileManager.getWholeTrainingData()
 
-    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod','productGroup',
+    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
+                   'productGroup',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
 
     # Keep just the columns of interest
@@ -72,56 +73,58 @@ def makePrediction():
     # Perform feature engineering on existing features
     data = engineerOldFeatures(data)
 
-    #TODO only for debugging purposes
+    # TODO only for debugging purposes
     # data = Toolbox.constructBadPercentageReturnColumn(data)
 
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
     # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
 
-    #Split into train/test data
-    trainData, testData = Toolbox.performTrainTestSplit(data,0.25)
+    # Split into train/test data
+    trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
-    #construct the percentage return column
-    trainData,testData = Toolbox.constructPercentageReturnColumn( trainData, testData,n_clusters= 150)
-    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'],1)
-    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'],1)
+    # construct the percentage return column
+    trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData, n_clusters=150)
+    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
 
-    #consturct median color/size per customer + difference
-    trainData,testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
+    # consturct median color/size per customer + difference
+    trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
     testData = testData.drop(['customerID'], 1)
 
-    print("\n\nFinal columns {} : {}".format(len(trainData.columns),trainData.columns))
+    print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
 
-    #X and Y train
-    xTrain,yTrain = Toolbox.getXandYMatrix(trainData,'returnQuantity')
+    # X and Y train
+    xTrain, yTrain = Toolbox.getXandYMatrix(trainData, 'returnQuantity')
 
-    #Select K best features according to variance
+    # Select K best features according to variance
     # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, trainData.columns)
     # testData = testData[selectedColumns].copy()
 
     # X and Y test
     xTest, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
 
-
     # xTrain = Toolbox.normalize(xTrain)
     # xTest = Toolbox.normalize(xTest)
 
-    #apply PCA
+    # apply PCA
     # xTrain,xTest = Toolbox.performPCA(xTrain,xTest,10)
 
     # apply RMB Transform ( + normalize and binarize )
     # xTrain,xTest = Toolbox.performRBMTransform(xTrain,xTest)
 
-    #Training the classifier
+    # Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
-    #Predicting
+    # FileManager.saveModel(classifier, 'gliga/randomForest', 'GligaRandomForest.pkl')
+    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+
+    # Predicting
     yPred = classifier.predict(xTest)
 
-    #Assessing the performance
+    # Assessing the performance
     Validator.performValidation(yPred, yTest)
     # Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
 
