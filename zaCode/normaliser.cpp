@@ -6,11 +6,19 @@
 #include <algorithm>
 #include <vector>
 
+const int MAX_LINE_NUM = 256;
+
+/// read a single column for csv file
 std::vector<double>
 read_data(char **argv, int col_num, FILE *f);
 
+/// normalise vector by using x = (x - mean) / stdev;
 void
 normalise(std::vector<double>& v);
+
+/// implementation of reading lines that does not overflow
+inline void
+read_ln(char *p, FILE *f, int max_len);
 
 int main(int argc, char **argv)
 {
@@ -23,9 +31,9 @@ int main(int argc, char **argv)
   // use c file i/o, which is faster than streams
   FILE *f = fopen(argv[1], "r");
 
-  char line[256];
+  char line[MAX_LINE_NUM];
   // first line has headers
-  fscanf(f, "%s", line);
+  read_ln(line, f, MAX_LINE_NUM);
 
   int cols = 0;
   char *p = line;
@@ -83,6 +91,22 @@ normalise(std::vector<double>& v)
 
 }
 
+inline void
+read_ln(char *p, FILE *f, int max_len)
+{
+  p[max_len-1] = 'A'; // put overflow marker
+
+  char fmt[50];
+  sprintf(fmt, "%%%ds", max_len-1);
+
+  fscanf(f, fmt, p);
+  if (p[max_len-1] != 'A') {
+    std::cerr << "overflow on reading line\n"
+                 "please change MAX_LINE_NUM and recompile" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+}
+
 std::vector<double>
 read_data(char **argv, int col_num, FILE *f)
 {
@@ -90,11 +114,20 @@ read_data(char **argv, int col_num, FILE *f)
   v.reserve(2400000);
  
   auto iter = v.begin();
-  char line[256];
+  char line[MAX_LINE_NUM];
+  char fmt[50];
+  sprintf(fmt, "%%%ds", MAX_LINE_NUM-1);
   
   while(!feof(f)) {
     // read line, skip cols not needed
-    fscanf(f, "%s", line);
+    line[MAX_LINE_NUM-1] = 'A';
+    fscanf(f, fmt, line);
+    if (line[MAX_LINE_NUM-1] != 'A') {
+      std::cerr << "overflow on reading line\n"
+	"please change MAX_LINE_NUM and recompile" << std::endl;
+      exit(EXIT_FAILURE);
+    } 
+
     char *p = line-1;
     int cnt_col = 0;
     while (cnt_col < col_num) {
