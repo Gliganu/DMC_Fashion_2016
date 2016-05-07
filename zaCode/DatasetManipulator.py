@@ -75,7 +75,7 @@ class DSetTransform:
             # normalise
             cnt = 0
             print("normalising " + col + "...")
-            n_col = "normed_" + col
+            ncol = "normed_" + col
             for idx in data.index:
                 cnt += 1
                 if cnt % 1e5 == 0:
