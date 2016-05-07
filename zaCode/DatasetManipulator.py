@@ -23,6 +23,7 @@ class DSetTransform:
                  feats_kept=[],
                  feats_ohe=[],
                  feats_condprob=[],
+                 feats_normed=[],
                  split_date=False,
                  target='returnQuantity'):
 
@@ -30,7 +31,44 @@ class DSetTransform:
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
+        self.feats_normed = feats_normed
         self.split_date_flag = split_date
+
+    def norm_features(self, data, keep_target=True):
+        """
+        returns new data set with normalised features, and optional target column
+        :param data:
+        :param keep_target:
+        :return:
+        """
+
+        retval = pd.DataFrame(columns=["normed_" + c for c in self.feats_normed])
+
+        rows = len(data)
+        for col in self.feats_normed:
+            # compute mean
+            m = 0
+            for idx in data.index:
+                m += data.loc[idx, col]
+            m /= rows
+
+            # compute stdev
+            stdev = 0
+            for idx in data.index:
+                tmp = m - data.loc[idx, col]
+                stdev += tmp * tmp
+
+            stdev = math.sqrt(stdev)
+
+            # normalise
+            for idx in data.index:
+                retval.loc[idx, "normed_" + col] = (data.loc[idx, col] - m) / stdev
+
+        if keep_target:
+            for idx in data.index:
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+
+        return retval
 
     def split_date(self, data, keep_target=True):
         """
@@ -177,8 +215,12 @@ class DSetTransform:
         cols = [data_filtered, data_cprob, data_ohe]
 
         if self.split_date_flag:
-            data_split = self.split_date(data, False) # false flag mean do not keep target
+            data_split = self.split_date(data, False) # false flag means do not keep target
             cols.append(data_split)
+
+        if len(self.feats_normed) != 0:
+            data_normed = self.norm_features(data, False) # false flag means do not keep target
+            cols.append(data_normed)
 
         return pd.concat(cols, 1)
 
