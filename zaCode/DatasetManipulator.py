@@ -15,8 +15,7 @@ import zaCode.FileManager as FileManager
 from sklearn.cluster import KMeans
 
 class DSetTransform:
-    """ Class Transforms a  by dropping or replacing features and partitioning data set
-        Currently implements OHE, Conditional Probability and Dropping Cols.
+    """ Class Performs data set transformations for preprocessing
     """
 
     def __init__(self,
@@ -43,26 +42,46 @@ class DSetTransform:
         """
 
         retval = pd.DataFrame(columns=["normed_" + c for c in self.feats_normed])
-
+        retval.loc[:, :] = data.loc[:, self.feats_normed]
+        
         rows = len(data)
         for col in self.feats_normed:
             # compute mean
             m = 0
+            cnt = 0
+            print("computing " + col +" mean...")
             for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
                 m += data.loc[idx, col]
             m /= rows
 
             # compute stdev
             stdev = 0
+            cnt = 0
+            print("computing " + col + " stdev...")
             for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                
                 tmp = m - data.loc[idx, col]
                 stdev += tmp * tmp
-
+            
+            stdev /= rows
             stdev = math.sqrt(stdev)
 
             # normalise
+            cnt = 0
+            print("normalising " + col + "...")
+            n_col = "normed_" + col
             for idx in data.index:
-                retval.loc[idx, "normed_" + col] = (data.loc[idx, col] - m) / stdev
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                    
+                retval.loc[idx, ncol] = (retval.loc[idx, ncol] - m) / stdev
 
         if keep_target:
             for idx in data.index:
