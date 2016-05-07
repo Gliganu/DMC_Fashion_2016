@@ -23,12 +23,43 @@ class DSetTransform:
                  feats_kept=[],
                  feats_ohe=[],
                  feats_condprob=[],
+                 split_date=False,
                  target='returnQuantity'):
 
         self.feats_kept = feats_kept
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
+        self.split_date_flag = split_date
+
+    def split_date(self, data, keep_target=True):
+        """
+        splits orderDate into orderYear,Month,Day
+        :param data: dataset to be transformed (not mutated)
+        :param keep_target: if true, also appends target variable in result data set
+        :return: new data set with orderDate split cols and optional target col
+        """
+
+        new_cols = ["orderYear", "orderMonth", "orderDay" ]
+        if keep_target:
+            new_cols.append(self.target)
+        retval = pd.DataFrame(columns = new_cols)
+
+        if keep_target:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+        else:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+
+        return retval
 
     def periodic_partition(self, data, fraction):
         """
@@ -141,10 +172,15 @@ class DSetTransform:
         # transform and drop target (we don't want duplicate cols)
         data_cprob = self.transformCondProb(data).drop([self.target], 1)
         data_ohe = self.transformOHE(data).drop([self.target], 1)
-
         data_filtered = self.dropOtherFeats(data) if drop else data.copy()
 
-        return pd.concat([data_filtered, data_cprob, data_ohe], 1)
+        cols = [data_filtered, data_cprob, data_ohe]
+
+        if self.split_date_flag:
+            data_split = self.split_date(data, False) # false flag mean do not keep target
+            cols.append(data_split)
+
+        return pd.concat(cols, 1)
 
 
 def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
