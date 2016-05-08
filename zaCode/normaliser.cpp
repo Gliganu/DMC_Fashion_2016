@@ -58,8 +58,12 @@ int main(int argc, char **argv)
   auto v = read_data(argv, col_num, f);
 
   normalise(v);
-  std::string out_path = ("normalised-" + std::string(argv[2]) + ".csv"); 
+  std::string out_colname = "normalised-" + std::string(argv[2]);
+  std::string out_path = out_colname + ".csv"; 
+
   FILE *out = fopen(out_path.c_str(), "w");
+
+  fprintf(out, "%s\n", out_colname.c_str());
   for (double x : v) {
     fprintf(out, "%lf\n", x);
   }
