@@ -46,6 +46,12 @@ int main(int argc, char **argv)
   int col_num = 0;
   p = line;
   char *end = strstr(line, argv[2]);
+  if (end == nullptr) {
+    std::cerr << "column \"" << argv[2]
+	      << "\" not found in dataset" << std::endl;
+    exit(EXIT_FAILURE);
+  }
+
   while (p != end) {
     if (*p++ == ',') {
       col_num++;
