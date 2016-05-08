@@ -349,7 +349,7 @@ def getCustomerClusteringDataFrame(data):
     return clusteringTrainData
 
 def getKnownCustomerIDToPercentageReturnDict(trainData):
-    print("Constructing Known Customer ID To Percentage Reteturned ....")
+    print("Constructing Known Customer ID To Percentage Returned ....")
 
     # avoid chain indexing warning
     trainDataCopy = trainData.copy()
@@ -419,7 +419,7 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData,clusteringTestDa
 
 def constructPercentageReturnColumn(trainData,testData,n_clusters):
 
-    print("Constructing Percetange Return Column....")
+    print("Constructing Percentage Return Column....")
 
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()

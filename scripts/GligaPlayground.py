@@ -5,6 +5,7 @@ import zaCode.DatasetManipulator as Toolbox
 import zaCode.FileManager as FileManager
 import zaCode.Validator as Validator
 from zaCode import Visualizer
+from sklearn.ensemble import VotingClassifier
 
 
 def addNewFeatures(data):
@@ -116,12 +117,20 @@ def makePrediction():
     # xTrain,xTest = Toolbox.performRBMTransform(xTrain,xTest)
 
     # Training the classifier
-    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+    # classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
     # FileManager.saveModel(classifier, 'gliga/randomForest', 'GligaRandomForest.pkl')
-    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+    logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
+    gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
+    randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+    naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
+
+    classifier = VotingClassifier(estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
+                                              ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
+                                  voting='hard')
 
     # Predicting
+    classifier.fit(xTrain, yTrain)
     yPred = classifier.predict(xTest)
 
     # Assessing the performance
