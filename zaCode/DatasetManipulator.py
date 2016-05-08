@@ -15,20 +15,108 @@ import zaCode.FileManager as FileManager
 from sklearn.cluster import KMeans
 
 class DSetTransform:
-    """ Class Transforms a  by dropping or replacing features and partitioning data set
-        Currently implements OHE, Conditional Probability and Dropping Cols.
+    """ Class Performs data set transformations for preprocessing
     """
 
     def __init__(self,
                  feats_kept=[],
                  feats_ohe=[],
                  feats_condprob=[],
+                 feats_normed=[],
+                 split_date=False,
                  target='returnQuantity'):
 
         self.feats_kept = feats_kept
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
+        self.feats_normed = feats_normed
+        self.split_date_flag = split_date
+
+    def norm_features(self, data, keep_target=True):
+        """
+        returns new data set with normalised features, and optional target column
+        :param data:
+        :param keep_target:
+        :return:
+        """
+
+        retval = pd.DataFrame(columns=["normed_" + c for c in self.feats_normed])
+        retval.loc[:, :] = data.loc[:, self.feats_normed]
+        
+        rows = len(data)
+        for col in self.feats_normed:
+            # compute mean
+            m = 0
+            cnt = 0
+            print("computing " + col +" mean...")
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                m += data.loc[idx, col]
+            m /= rows
+
+            # compute stdev
+            stdev = 0
+            cnt = 0
+            print("computing " + col + " stdev...")
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                
+                tmp = m - data.loc[idx, col]
+                stdev += tmp * tmp
+            
+            stdev /= rows
+            stdev = math.sqrt(stdev)
+
+            # normalise
+            cnt = 0
+            print("normalising " + col + "...")
+            ncol = "normed_" + col
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                    
+                retval.loc[idx, ncol] = (retval.loc[idx, ncol] - m) / stdev
+
+        if keep_target:
+            for idx in data.index:
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+
+        return retval
+
+    def split_date(self, data, keep_target=True):
+        """
+        splits orderDate into orderYear,Month,Day
+        :param data: dataset to be transformed (not mutated)
+        :param keep_target: if true, also appends target variable in result data set
+        :return: new data set with orderDate split cols and optional target col
+        """
+
+        new_cols = ["orderYear", "orderMonth", "orderDay" ]
+        if keep_target:
+            new_cols.append(self.target)
+        retval = pd.DataFrame(columns = new_cols)
+
+        if keep_target:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+        else:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+
+        return retval
 
     def periodic_partition(self, data, fraction):
         """
@@ -141,10 +229,19 @@ class DSetTransform:
         # transform and drop target (we don't want duplicate cols)
         data_cprob = self.transformCondProb(data).drop([self.target], 1)
         data_ohe = self.transformOHE(data).drop([self.target], 1)
-
         data_filtered = self.dropOtherFeats(data) if drop else data.copy()
 
-        return pd.concat([data_filtered, data_cprob, data_ohe], 1)
+        cols = [data_filtered, data_cprob, data_ohe]
+
+        if self.split_date_flag:
+            data_split = self.split_date(data, False) # false flag means do not keep target
+            cols.append(data_split)
+
+        if len(self.feats_normed) != 0:
+            data_normed = self.norm_features(data, False) # false flag means do not keep target
+            cols.append(data_normed)
+
+        return pd.concat(cols, 1)
 
 
 def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
