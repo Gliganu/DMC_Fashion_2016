@@ -48,10 +48,17 @@ def engineerOldFeatures(data):
     return data
 
 
-def makePrediction():
-    print("Reading data...")
+def serializeDataFrame():
 
-    data = FileManager.getRandomTrainingData(50000)
+    foldername =  'allFeatures'
+    dataFrameName ='allFeatures.pkl'
+
+    data = constructDataFromScratch()
+    FileManager.saveDataFrame(data,foldername,dataFrameName)
+
+def constructDataFromScratch():
+
+    data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
 
@@ -74,12 +81,28 @@ def makePrediction():
     # Perform feature engineering on existing features
     data = engineerOldFeatures(data)
 
-    # TODO only for debugging purposes
-    # data = Toolbox.constructBadPercentageReturnColumn(data)
-
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
     # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
+
+    return data
+
+def getSerializedDataFrame():
+    foldername = 'allFeatures'
+    dataFrameName = 'allFeatures.pkl'
+
+    return FileManager.loadDataFrame(foldername,dataFrameName)
+
+
+
+def makePrediction():
+    print("Reading data...")
+
+
+    # data = constructDataFromScratch()
+    #
+    data = getSerializedDataFrame()
+
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
@@ -128,6 +151,9 @@ def makePrediction():
     classifier = VotingClassifier(estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
                                               ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
                                   voting='hard')
+    FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
+
+    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
 
     # Predicting
     classifier.fit(xTrain, yTrain)
@@ -141,8 +167,9 @@ def makePrediction():
 if __name__ == '__main__':
     startTime = time.time()
 
-    # play()
     makePrediction()
+    #
+    # serializeDataFrame()
 
     # Visualizer.calculateLearningCurve(keptColumns)
     # Visualizer.calculateRocCurve()

@@ -67,3 +67,13 @@ def saveModel(classifier, foldername, filename):
 
 def loadModel(foldername, filename):
     return joblib.load('../models/' + foldername + '/' + filename)
+
+
+def saveDataFrame(classifier, foldername, filename):
+    if not os.path.exists('../dataframes/' + foldername):
+        os.makedirs('../dataframes/' + foldername)
+    joblib.dump(classifier, '../dataframes/' + foldername + '/' + filename)
+
+def loadDataFrame(foldername, filename):
+    return joblib.load('../dataframes/' + foldername + '/' + filename)
+
