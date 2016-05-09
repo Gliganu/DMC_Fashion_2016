@@ -49,16 +49,15 @@ def engineerOldFeatures(data):
 
 
 def serializeDataFrame():
-
-    foldername =  'allFeatures'
-    dataFrameName ='allFeatures.pkl'
+    foldername = 'allFeatures'
+    dataFrameName = 'allFeatures.pkl'
 
     data = constructDataFromScratch()
-    FileManager.saveDataFrame(data,foldername,dataFrameName)
+    FileManager.saveDataFrame(data, foldername, dataFrameName)
+
 
 def constructDataFromScratch():
-
-    data = FileManager.getRandomTrainingData(1000)
+    data = FileManager.getRandomTrainingData(50000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
 
@@ -87,21 +86,20 @@ def constructDataFromScratch():
 
     return data
 
+
 def getSerializedDataFrame():
     foldername = 'allFeatures'
     dataFrameName = 'allFeatures.pkl'
 
-    return FileManager.loadDataFrame(foldername,dataFrameName)
-
+    return FileManager.loadDataFrame(foldername, dataFrameName)
 
 
 def makePrediction():
     print("Reading data...")
 
-
-    # data = constructDataFromScratch()
+    data = constructDataFromScratch()
     #
-    data = getSerializedDataFrame()
+    # data = getSerializedDataFrame()
 
 
     # Split into train/test data
@@ -148,16 +146,18 @@ def makePrediction():
     randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
     naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
 
-    classifier = VotingClassifier(estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
-                                              ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
-                                  voting='hard')
-    FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
+    # classifier = VotingClassifier(estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
+    #                                           ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
+    #                               voting='hard')
+    # FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
 
     # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
 
     # Predicting
-    classifier.fit(xTrain, yTrain)
-    yPred = classifier.predict(xTest)
+    predictionMatrix = Toolbox.constructPredictionMatrix(xTest, logisticRegressionClassifier,
+                                                         gradientBoostingClassifier, randomForestClassifier,
+                                                         naiveBayesClassifier)
+    yPred = Toolbox.makeHardVoting(predictionMatrix)
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)
