@@ -69,11 +69,21 @@ def loadModel(foldername, filename):
     return joblib.load('../models/' + foldername + '/' + filename)
 
 
-def saveDataFrame(classifier, foldername, filename):
-    if not os.path.exists('../dataframes/' + foldername):
-        os.makedirs('../dataframes/' + foldername)
-    joblib.dump(classifier, '../dataframes/' + foldername + '/' + filename)
+def saveDataFrame(dataFrame, fileName):
+    if not os.path.exists('../dataframes'):
+        os.makedirs('../dataframes')
 
-def loadDataFrame(foldername, filename):
-    return joblib.load('../dataframes/' + foldername + '/' + filename)
+    dataFrame.to_csv('../dataframes/' + fileName, sep='\t', index=False)
+
+def loadDataFrameFromCsv(fileName, size = None):
+
+    inputFileName = '../dataframes/'+fileName
+
+    data = pd.read_csv(inputFileName, delimiter='\t', skipinitialspace=True)
+
+    #get random somple of size = size
+    if size:
+        data, _ = train_test_split(data, train_size=size)
+
+    return data
 

@@ -49,17 +49,19 @@ def engineerOldFeatures(data):
 
 
 def serializeDataFrame():
-    foldername = 'allFeatures'
-    dataFrameName = 'allFeatures.pkl'
+
+    fileName =  'allFeatures.csv'
 
     data = constructDataFromScratch()
-    FileManager.saveDataFrame(data, foldername, dataFrameName)
 
+    FileManager.saveDataFrame(data,fileName)
 
 def constructDataFromScratch():
+
+    # data = FileManager.getRandomTrainingData(1000)
     data = FileManager.getRandomTrainingData(50000)
     # data = FileManager.get10kTrainingData()
-    # data = FileManager.getWholeTrainingData()
+    data = FileManager.getWholeTrainingData()
 
     keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'productGroup',
@@ -87,19 +89,15 @@ def constructDataFromScratch():
     return data
 
 
-def getSerializedDataFrame():
-    foldername = 'allFeatures'
-    dataFrameName = 'allFeatures.pkl'
-
-    return FileManager.loadDataFrame(foldername, dataFrameName)
 
 
 def makePrediction():
     print("Reading data...")
 
     data = constructDataFromScratch()
-    #
-    # data = getSerializedDataFrame()
+
+    # data = constructDataFromScratch()
+    data = FileManager.loadDataFrameFromCsv('allFeatures.csv')
 
 
     # Split into train/test data
@@ -167,11 +165,10 @@ def makePrediction():
 if __name__ == '__main__':
     startTime = time.time()
 
-    makePrediction()
-    #
+    # makePrediction()
     # serializeDataFrame()
 
-    # Visualizer.calculateLearningCurve(keptColumns)
+    Visualizer.calculateLearningCurve()
     # Visualizer.calculateRocCurve()
 
 

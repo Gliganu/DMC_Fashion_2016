@@ -87,20 +87,40 @@ def calculateRocCurve():
     plt.xlabel('False Positive Rate')
     plt.show()
 
-def calculateLearningCurve(keptColumns):
+def calculateLearningCurve():
 
-    # construct Train & Test Data
-    xTrain, yTrain, xTest, yTest = DatasetManipulator.getTrainAndTestData(keptColumns)
+    data = FileManager.loadDataFrameFromCsv('allFeatures.csv',size=1000000)
 
-    # training the classifier
-    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+    # Split into train/test data
+    trainData, testData = DatasetManipulator.performTrainTestSplit(data, 0.25)
+
+    # construct the percentage return column
+    # trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData, n_clusters=150)
+    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+
+    # consturct median color/size per customer + difference
+    trainData, testData = DatasetManipulator.constructCustomerMedianSizeAndColor(trainData, testData)
+
+    trainData = trainData.drop(['customerID'], 1)
+    testData = testData.drop(['customerID'], 1)
+
+    print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
+
+    # X and Y train
+    xTrain, yTrain = DatasetManipulator.getXandYMatrix(trainData, 'returnQuantity')
+
+    # X and Y test
+    xTest, yTest = DatasetManipulator.getXandYMatrix(testData, 'returnQuantity')
 
     # for full dataset
-    trainSizes =  np.linspace(100000,1136593,5,dtype=int)
+    # trainSizes =  np.linspace(100000,1136593,5,dtype=int)
 
     # for 1 mil
-    # trainSizes =  np.linspace(100000,493055,5,dtype=int)
+    trainSizes =  np.linspace(100000,493055,5,dtype=int)
 
+
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
     plot_learning_curve(classifier,xTrain,yTrain,trainSizes)
 
