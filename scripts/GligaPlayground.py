@@ -5,6 +5,7 @@ import zaCode.DatasetManipulator as Toolbox
 import zaCode.FileManager as FileManager
 import zaCode.Validator as Validator
 from zaCode import Visualizer
+import pandas as pd
 from sklearn.ensemble import VotingClassifier
 
 
@@ -61,7 +62,10 @@ def constructDataFromScratch():
     # data = FileManager.getRandomTrainingData(1000)
     data = FileManager.getRandomTrainingData(50000)
     # data = FileManager.get10kTrainingData()
-    data = FileManager.getWholeTrainingData()
+    # data = FileManager.getWholeTrainingData()
+
+    allDistinctOHEdata = FileManager.getDistinctOHEFeatures()
+    data = pd.concat([data, allDistinctOHEdata], axis=0)
 
     keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'productGroup',
@@ -94,11 +98,8 @@ def constructDataFromScratch():
 def makePrediction():
     print("Reading data...")
 
-    data = constructDataFromScratch()
-
     # data = constructDataFromScratch()
     data = FileManager.loadDataFrameFromCsv('allFeatures.csv')
-
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
@@ -138,7 +139,7 @@ def makePrediction():
     # Training the classifier
     # classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
 
-    # FileManager.saveModel(classifier, 'gliga/randomForest', 'GligaRandomForest.pkl')
+    # FileManager.saveModel(classifier, 'gliga/naiveBayes', 'GligaNaiveBayes.pkl')
     logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
     gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
     randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
@@ -148,8 +149,6 @@ def makePrediction():
     #                                           ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
     #                               voting='hard')
     # FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
-
-    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
 
     # Predicting
     predictionMatrix = Toolbox.constructPredictionMatrix(xTest, logisticRegressionClassifier,

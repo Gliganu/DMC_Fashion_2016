@@ -60,6 +60,12 @@ def get1000kTrainingData():
 
     return data
 
+def getDistinctOHEFeatures():
+    inputFileName = '../data/orders_distinct.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
 def saveModel(classifier, foldername, filename):
     if not os.path.exists('../models/' + foldername):
         os.makedirs('../models/' + foldername)
