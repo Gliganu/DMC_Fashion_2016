@@ -1,5 +1,7 @@
 import pandas as pd
 from sklearn.cross_validation import train_test_split
+from sklearn.externals import joblib
+import os
 
 def getWholeTrainingData():
     inputFileName = '../data/orders_train.txt'
@@ -57,3 +59,37 @@ def get1000kTrainingData():
     data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
 
     return data
+
+def getDistinctOHEFeatures():
+    inputFileName = '../data/orders_distinct.txt'
+    data = pd.read_csv(inputFileName, delimiter=';', skipinitialspace=True)
+
+    return data
+
+def saveModel(classifier, foldername, filename):
+    if not os.path.exists('../models/' + foldername):
+        os.makedirs('../models/' + foldername)
+    joblib.dump(classifier, '../models/' + foldername + '/' + filename)
+
+def loadModel(foldername, filename):
+    return joblib.load('../models/' + foldername + '/' + filename)
+
+
+def saveDataFrame(dataFrame, fileName):
+    if not os.path.exists('../dataframes'):
+        os.makedirs('../dataframes')
+
+    dataFrame.to_csv('../dataframes/' + fileName, sep='\t', index=False)
+
+def loadDataFrameFromCsv(fileName, size = None):
+
+    inputFileName = '../dataframes/'+fileName
+
+    data = pd.read_csv(inputFileName, delimiter='\t', skipinitialspace=True)
+
+    #get random somple of size = size
+    if size:
+        data, _ = train_test_split(data, train_size=size)
+
+    return data
+

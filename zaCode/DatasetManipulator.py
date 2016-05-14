@@ -7,6 +7,7 @@ from datetime import datetime
 from collections import defaultdict
 from copy import copy
 from sklearn.cross_validation import train_test_split
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, LabelEncoder
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer,LabelEncoder
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, MinMaxScaler
 from sklearn.feature_selection import SelectKBest, f_regression
@@ -15,21 +16,110 @@ from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
 from sklearn.cluster import KMeans
 
+
 class DSetTransform:
-    """ Class Transforms a  by dropping or replacing features and partitioning data set
-        Currently implements OHE, Conditional Probability and Dropping Cols.
+    """ Class Performs data set transformations for preprocessing
     """
 
     def __init__(self,
                  feats_kept=[],
                  feats_ohe=[],
                  feats_condprob=[],
+                 feats_normed=[],
+                 split_date=False,
                  target='returnQuantity'):
 
         self.feats_kept = feats_kept
         self.feats_ohe = feats_ohe
         self.feats_condprob = feats_condprob
         self.target = target
+        self.feats_normed = feats_normed
+        self.split_date_flag = split_date
+
+    def norm_features(self, data, keep_target=True):
+        """
+        returns new data set with normalised features, and optional target column
+        :param data:
+        :param keep_target:
+        :return:
+        """
+
+        retval = pd.DataFrame(columns=["normed_" + c for c in self.feats_normed])
+        retval.loc[:, :] = data.loc[:, self.feats_normed]
+
+        rows = len(data)
+        for col in self.feats_normed:
+            # compute mean
+            m = 0
+            cnt = 0
+            print("computing " + col + " mean...")
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+                m += data.loc[idx, col]
+            m /= rows
+
+            # compute stdev
+            stdev = 0
+            cnt = 0
+            print("computing " + col + " stdev...")
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+
+                tmp = m - data.loc[idx, col]
+                stdev += tmp * tmp
+
+            stdev /= rows
+            stdev = math.sqrt(stdev)
+
+            # normalise
+            cnt = 0
+            print("normalising " + col + "...")
+            ncol = "normed_" + col
+            for idx in data.index:
+                cnt += 1
+                if cnt % 1e5 == 0:
+                    print("passed elem " + str(cnt) + "...")
+
+                retval.loc[idx, ncol] = (retval.loc[idx, ncol] - m) / stdev
+
+        if keep_target:
+            for idx in data.index:
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+
+        return retval
+
+    def split_date(self, data, keep_target=True):
+        """
+        splits orderDate into orderYear,Month,Day
+        :param data: dataset to be transformed (not mutated)
+        :param keep_target: if true, also appends target variable in result data set
+        :return: new data set with orderDate split cols and optional target col
+        """
+
+        new_cols = ["orderYear", "orderMonth", "orderDay"]
+        if keep_target:
+            new_cols.append(self.target)
+        retval = pd.DataFrame(columns=new_cols)
+
+        if keep_target:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+                retval.loc[idx, self.target] = data.loc[idx, self.target]
+        else:
+            for idx in data.index:
+                ls = data.loc[idx, "orderDate"].split("-")
+                retval.loc[idx, "orderYear"] = int(ls[0])
+                retval.loc[idx, "orderMonth"] = int(ls[1])
+                retval.loc[idx, "orderDay"] = int(ls[2])
+
+        return retval
 
     def periodic_partition(self, data, fraction):
         """
@@ -44,7 +134,7 @@ class DSetTransform:
 
         cnt = 0
 
-        retval = pd.DataFrame(columns = data.columns)
+        retval = pd.DataFrame(columns=data.columns)
         indicator = int(1.0 / fraction)
         for idx, vals in data.iterrows():
             if cnt % indicator == 0:
@@ -68,10 +158,9 @@ class DSetTransform:
         A = pd.DataFrame(columns=data.columns)
         B = pd.DataFrame(columns=data.columns)
 
-
         cnt = 0
         decision = False
-        #take 10 products at a time to speedup subsampling
+        # take 10 products at a time to speedup subsampling
 
         for idx in data.index:
             if cnt % 5 == 0:
@@ -142,10 +231,19 @@ class DSetTransform:
         # transform and drop target (we don't want duplicate cols)
         data_cprob = self.transformCondProb(data).drop([self.target], 1)
         data_ohe = self.transformOHE(data).drop([self.target], 1)
-
         data_filtered = self.dropOtherFeats(data) if drop else data.copy()
 
-        return pd.concat([data_filtered, data_cprob, data_ohe], 1)
+        cols = [data_filtered, data_cprob, data_ohe]
+
+        if self.split_date_flag:
+            data_split = self.split_date(data, False)  # false flag means do not keep target
+            cols.append(data_split)
+
+        if len(self.feats_normed) != 0:
+            data_normed = self.norm_features(data, False)  # false flag means do not keep target
+            cols.append(data_normed)
+
+        return pd.concat(cols, 1)
 
 
 def mapFeaturesToCondProbs(rawData, featureMask=None, target='returnQuantity'):
@@ -304,7 +402,7 @@ def performDateEngineering(rawData, dateColumn):
     return data
 
 
-def performOHEOnColumn(data, columnName, withRemoval = True):
+def performOHEOnColumn(data, columnName, withRemoval=True):
     """
         warning: may mutate your input data. cached a copy if needed!
     """
@@ -334,10 +432,10 @@ def printNumberOfCustomersSeen(trainData, testData):
 
     print("Percentage of already seen customers in test set: {}".format(seenCustomersNumber / totalTrainCustomer))
 
-def getCustomerClusteringDataFrame(data):
 
-    medianColumns = ['colorCode','productGroup','deviceID','paymentMethod']
-    meanColumns = ['normalisedSizeCode','price','rrp','quantity']
+def getCustomerClusteringDataFrame(data):
+    medianColumns = ['colorCode', 'productGroup', 'deviceID', 'paymentMethod']
+    meanColumns = ['normalisedSizeCode', 'price', 'rrp', 'quantity']
 
     medianData = data[medianColumns].groupby(data['customerID'])
     meanData = data[meanColumns].groupby(data['customerID'])
@@ -349,8 +447,9 @@ def getCustomerClusteringDataFrame(data):
 
     return clusteringTrainData
 
+
 def getKnownCustomerIDToPercentageReturnDict(trainData):
-    print("Constructing Known Customer ID To Percentage Reteturned ....")
+    print("Constructing Known Customer ID To Percentage Returned ....")
 
     # avoid chain indexing warning
     trainDataCopy = trainData.copy()
@@ -368,69 +467,66 @@ def getKnownCustomerIDToPercentageReturnDict(trainData):
 
     return customerIDtoPercentageReturnDict
 
-def getFullCustomerIDToPercentageReturnDict(clusteringTrainData,clusteringTestData,knownCustomerIdToPercentageReturnDict,n_clusters):
 
+def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestData,
+                                            knownCustomerIdToPercentageReturnDict, n_clusters):
     print("Clustering customers....")
 
     # compute the clusters based on the training data
     clusteringTrainDataValues = clusteringTrainData.values
     testDataCopy = clusteringTestData.copy()
 
-
     kMeans = KMeans(n_clusters=n_clusters)
     kMeans.fit(clusteringTrainDataValues)
     labels = kMeans.labels_
 
-    #append the cluster index column to the dataframe
+    # append the cluster index column to the dataframe
     trainDataCopy = clusteringTrainData.copy()
     trainDataCopy.loc[:, 'clusterIndex'] = labels
 
-
-    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map((lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
-
+    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map(
+        (lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
 
     clusterLabelToPercentageReturnDict = {}
 
-    #for each cluster, compute it's percentage return average based on the percReturn of the train data
+    # for each cluster, compute it's percentage return average based on the percReturn of the train data
     for i in range(n_clusters):
         customersInCluster = trainDataCopy[trainDataCopy['clusterIndex'] == i]
         average = customersInCluster['percentageReturned'].mean()
         clusterLabelToPercentageReturnDict[i] = average
 
-
     print("Predicting clusters for customers....")
 
-    #todo for already seen customers do NOT predict !
+    # todo for already seen customers do NOT predict !
 
-    #predict in which cluster the entries in the test data will be
+    # predict in which cluster the entries in the test data will be
     predictedTestLabels = kMeans.predict(testDataCopy)
     testDataCopy.loc[:, 'clusterIndex'] = predictedTestLabels
 
-    #set the percReturn of that entry to the mean of that belonging cluster
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['clusterIndex'].apply(lambda clusterIndex: clusterLabelToPercentageReturnDict[clusterIndex])
-
+    # set the percReturn of that entry to the mean of that belonging cluster
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['clusterIndex'].apply(
+        lambda clusterIndex: clusterLabelToPercentageReturnDict[clusterIndex])
 
     testCustomerIdToPercentageReturnDict = testDataCopy.to_dict().get('percentageReturned')
 
-    #merge the 2 dictionaries
+    # merge the 2 dictionaries
     knownCustomerIdToPercentageReturnDict.update(testCustomerIdToPercentageReturnDict)
 
     return knownCustomerIdToPercentageReturnDict
 
 
-def constructPercentageReturnColumn(trainData,testData,n_clusters):
-
-    print("Constructing Percetange Return Column....")
+def constructPercentageReturnColumn(trainData, testData, n_clusters):
+    print("Constructing Percentage Return Column....")
 
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()
 
-    #labelize the previously OHEed features
+    # labelize the previously OHEed features
     paymendEncoder = LabelEncoder()
     deviceEncoder = LabelEncoder()
 
-    paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'],testDataCopy['paymentMethod']))
-    deviceEncoder.fit(np.append(trainDataCopy['deviceID'],testDataCopy['deviceID']))
+    paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'], testDataCopy['paymentMethod']))
+    deviceEncoder.fit(np.append(trainDataCopy['deviceID'], testDataCopy['deviceID']))
 
     trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
     testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
@@ -438,20 +534,23 @@ def constructPercentageReturnColumn(trainData,testData,n_clusters):
     trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
     testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
 
-
     clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
     clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
 
     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
     fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
-                                                                                    clusteringTestData,
-                                                                                    knownCustomerIdToPercentageReturnDict,n_clusters)
+                                                                                   clusteringTestData,
+                                                                                   knownCustomerIdToPercentageReturnDict,
+                                                                                   n_clusters)
 
-    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(lambda custId: fullCustomerIdToPercentageReturnDict[custId])
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
+        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
+        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
 
-    return trainDataCopy,testDataCopy
+    return trainDataCopy, testDataCopy
+
 
 def constructBadPercentageReturnColumn(data):
     """DO NOT USE! It's the old bad percentage return which gives us optimistic results"""
@@ -463,7 +562,8 @@ def constructBadPercentageReturnColumn(data):
     dataByCustomer = dataCopy[['quantity', 'returnQuantity']].groupby(dataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1,x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
+        'quantity'].apply(lambda x: max(1, x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
@@ -797,6 +897,7 @@ def scaleMatrix(trainMatrix, testMatrix):
     return trainScaled, testScaled
 
 
+
 def normalizeMatrix(dataMatrix):
     """
     Normalizes all the columns in the matrix
@@ -862,3 +963,18 @@ def performRBMTransform(xTrain, xTest):
     xTest = rmb.transform(xTest)
 
     return xTrain, xTest
+
+
+def constructPredictionMatrix(xTest, *classifiers):
+    predictionMatrix = np.empty(classifiers[0].predict(xTest).shape)
+    for classifier in classifiers:
+        yPredict = classifier.predict(xTest)
+        predictionMatrix = np.vstack((predictionMatrix, yPredict))
+    return np.delete(predictionMatrix, 0, 0)
+
+
+def makeHardVoting(predictionMatrix):
+    sumPrediction = np.sum(predictionMatrix, axis=0)
+    nrOfClassifiers = predictionMatrix.shape[0]
+    majorityFunc = np.vectorize(lambda arg: 1. if arg >= (nrOfClassifiers / 2.0) else 0.)
+    return majorityFunc(sumPrediction)

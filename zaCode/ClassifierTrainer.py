@@ -8,11 +8,11 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.svm import LinearSVC
 import numpy as np
 from sklearn.cross_validation import StratifiedKFold
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, BernoulliNB
 
 
 def trainLogisticRegression(xTrain, yTrain):
-    classifier = LogisticRegression(n_jobs=-1, verbose=1, solver="lbfgs")
+    classifier = LogisticRegression(C=35, n_jobs=-1, verbose=1, solver="liblinear", class_weight='balanced')
 
     classifier.fit(xTrain, yTrain)
 
@@ -70,6 +70,7 @@ def trainGradientBoostingClassifier(xTrain, yTrain):
 def trainNB(xTrain, yTrain):
 
     classifier = MultinomialNB()
+    # classifier = BernoulliNB()
 
     classifier.fit(xTrain, yTrain)
 
@@ -98,8 +99,8 @@ def trainSVM(xTrain, yTrain, kernelType='rbf'):
 def trainClassifier(xTrain, yTrain):
     print("Training classifier...")
 
-    classifier = trainLogisticRegression(xTrain, yTrain)
-    # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
+    # classifier = trainLogisticRegression(xTrain, yTrain)
+    classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
     # classifier = trainNB(xTrain, yTrain)
     # classifier = trainSVM(xTrain, yTrain)

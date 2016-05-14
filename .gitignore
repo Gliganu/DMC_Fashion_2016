@@ -28,6 +28,7 @@ _ReSharper*/
 [Tt]est[Rr]esult*
 #we need the data folder for the scripts
 data
+dataframes
 .idea
 %HOMEDRIVE%%HOMEPATH%
 .ipynb_checkpoints
