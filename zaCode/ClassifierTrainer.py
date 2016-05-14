@@ -102,6 +102,6 @@ def trainClassifier(xTrain, yTrain):
     # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
     # classifier = trainNB(xTrain, yTrain)
-    classifier = trainSVM(xTrain, yTrain)
+    # classifier = trainSVM(xTrain, yTrain)
 
     return classifier

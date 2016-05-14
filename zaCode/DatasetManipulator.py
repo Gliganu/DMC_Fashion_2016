@@ -712,6 +712,12 @@ def constructOrderNumberColumn(data):
     dataCopy['orderNumber'] = data['orderID'].apply(lambda id: dict_order_number[id])
     return dataCopy
 
+def constructHasVoucherColumn(data):
+    print("Constructing hasVoucher column...")
+    dataCopy = data.copy()
+    dataCopy['hasVoucher'] = dataCopy['voucherID'].apply(lambda v: 0 if v == 0 else 1)
+    dataCopy.drop(['voucherID'], axis=1)
+    return dataCopy
 
 def dropMissingValues(data):
     return data.dropna()

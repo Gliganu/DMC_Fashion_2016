@@ -25,6 +25,8 @@ def addNewFeatures(data):
 
     data = Toolbox.constructBasketColumns(data)
 
+    data = Toolbox.constructHasVoucherColumn(data)
+
     return data
 
 
@@ -45,11 +47,11 @@ def engineerOldFeatures(data):
 def makePrediction():
     print("Reading data...")
 
-    data = FileManager.getRandomTrainingData(250000)
+    data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
 
-    keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
+    keptColumns = ['voucherID', 'orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
 
     # Keep just the columns of interest
@@ -77,7 +79,7 @@ def makePrediction():
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
     # construct the percentage return column
-    trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData)
+    # trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData)
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
