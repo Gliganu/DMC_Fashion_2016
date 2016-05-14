@@ -48,6 +48,10 @@ from sklearn.metrics import roc_curve, auc
 #
 #
 
+def plotFeatureHistogram(data, featureName):
+
+    data.hist(column = featureName, bins = 20)
+    plt.show()
 
 def plotFeatureImportance(feature_importance,featureNames):
 

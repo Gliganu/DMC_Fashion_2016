@@ -10,12 +10,10 @@ from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, LabelEncoder
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer,LabelEncoder
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, MinMaxScaler
-from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.decomposition import PCA
 from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
-from sklearn.cluster import KMeans
-
+from sklearn.cluster import KMeans,SpectralClustering,DBSCAN
 
 class DSetTransform:
     """ Class Performs data set transformations for preprocessing
@@ -433,16 +431,17 @@ def printNumberOfCustomersSeen(trainData, testData):
 
 
 def getCustomerClusteringDataFrame(data):
-    medianColumns = ['colorCode', 'productGroup', 'deviceID', 'paymentMethod']
+    # medianColumns = ['colorCode', 'productGroup', 'deviceID', 'paymentMethod']
     meanColumns = ['normalisedSizeCode', 'price', 'rrp', 'quantity']
 
-    medianData = data[medianColumns].groupby(data['customerID'])
+    # medianData = data[medianColumns].groupby(data['customerID'])
     meanData = data[meanColumns].groupby(data['customerID'])
 
-    dataMedianByCustomer = medianData.median()
+    # dataMedianByCustomer = medianData.agg(lambda x:x.value_counts().index[0])
     dataMeanByCustomer = meanData.mean()
 
-    clusteringTrainData = dataMedianByCustomer.join(dataMeanByCustomer)
+    # clusteringTrainData = dataMedianByCustomer.join(dataMeanByCustomer)
+    clusteringTrainData = dataMeanByCustomer
 
     return clusteringTrainData
 
@@ -457,8 +456,7 @@ def getKnownCustomerIDToPercentageReturnDict(trainData):
     dataByCustomer = trainDataCopy[['quantity', 'returnQuantity']].groupby(trainDataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
-        'quantity'].apply(lambda x: max(1, x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1, x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
@@ -466,6 +464,13 @@ def getKnownCustomerIDToPercentageReturnDict(trainData):
 
     return customerIDtoPercentageReturnDict
 
+
+def getPercentageReturnForCustomerID(row,knownCustomerIdToPercentageReturnDict,clusterLabelToPercentageReturnDict):
+
+    if row.name in knownCustomerIdToPercentageReturnDict:
+        return knownCustomerIdToPercentageReturnDict[row.name]
+
+    return clusterLabelToPercentageReturnDict[row.clusterIndex]
 
 def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestData,
                                             knownCustomerIdToPercentageReturnDict, n_clusters):
@@ -483,8 +488,9 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
     trainDataCopy = clusteringTrainData.copy()
     trainDataCopy.loc[:, 'clusterIndex'] = labels
 
-    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map(
-        (lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
+    # trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map((lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
+    trainDataCopy.loc[:, 'percentageReturned'] =  trainDataCopy.apply(getPercentageReturnForCustomerID,knownCustomerIdToPercentageReturnDict = knownCustomerIdToPercentageReturnDict, clusterLabelToPercentageReturnDict = None, axis=1)
+
 
     clusterLabelToPercentageReturnDict = {}
 
@@ -496,15 +502,14 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
 
     print("Predicting clusters for customers....")
 
-    # todo for already seen customers do NOT predict !
 
     # predict in which cluster the entries in the test data will be
     predictedTestLabels = kMeans.predict(testDataCopy)
     testDataCopy.loc[:, 'clusterIndex'] = predictedTestLabels
 
-    # set the percReturn of that entry to the mean of that belonging cluster
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['clusterIndex'].apply(
-        lambda clusterIndex: clusterLabelToPercentageReturnDict[clusterIndex])
+    # set the percReturn of that entry to the mean of that belonging cluster in case we haven't seen him
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy.apply(getPercentageReturnForCustomerID,knownCustomerIdToPercentageReturnDict = knownCustomerIdToPercentageReturnDict, clusterLabelToPercentageReturnDict = clusterLabelToPercentageReturnDict,axis=1)
+
 
     testCustomerIdToPercentageReturnDict = testDataCopy.to_dict().get('percentageReturned')
 
@@ -695,10 +700,7 @@ def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only
     newColumnsToBeDeleted = [featureName + "^1" for featureName in sourceFeatures]
     newColumnsDataFrame = newColumnsDataFrame.drop(newColumnsToBeDeleted, 1)
 
-    finalData = data.join(newColumnsDataFrame)
-
-    # todo one extra row added at the end. weird. to investigate
-    finalData = finalData.dropna()
+    finalData = data.reset_index().join(newColumnsDataFrame)
 
     return finalData
 
@@ -855,7 +857,7 @@ def selectKBest(xTrain, yTrain, k, columnNames):
     """
     Select the K best features based on the variance they have along the training set
     """
-    selector = SelectKBest(f_regression, k=k)  # k is number of features.
+    selector = SelectKBest(f_classif, k=k)  # k is number of features.
     newXTrain = selector.fit_transform(xTrain, yTrain)
 
     # print the remaining features
@@ -950,8 +952,8 @@ def performRBMTransform(xTrain, xTest):
     xTrain = normalize(xTrain)
     xTest = normalize(xTest)
 
-    # xTrain = binarizeMatrix(xTrain,0.5)
-    # xTest = binarizeMatrix(xTest,0.5)
+    xTrain = binarizeMatrix(xTrain,0.5)
+    xTest = binarizeMatrix(xTest,0.5)
 
     rmb = BernoulliRBM(verbose=True)
 
