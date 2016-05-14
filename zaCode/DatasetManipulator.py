@@ -382,7 +382,6 @@ def constructBasketColumns(data):
     data['basketSize'] = data['orderID'].apply(lambda id: dict_basket_size[id])
     data['basketQuantity'] = data['orderID'].apply(lambda id: dict_basket_total_quantity[id])
 
-    data = data.drop(['orderID'], 1)
     return data
 
 

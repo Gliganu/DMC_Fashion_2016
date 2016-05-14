@@ -51,7 +51,8 @@ def makePrediction():
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
 
-    keptColumns = ['voucherID', 'orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
+    keptColumns = ['voucherID', 'orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID',
+                   'paymentMethod',
                    'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
 
     # Keep just the columns of interest
@@ -86,6 +87,8 @@ def makePrediction():
     trainData = trainData.drop(['voucherID'], 1)
     testData = testData.drop(['customerID'], 1)
     testData = testData.drop(['voucherID'], 1)
+    trainData = trainData.drop(['orderID'], 1)
+    trainData = trainData.drop(['orderID'], 1)
 
     print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
 
@@ -118,10 +121,7 @@ if __name__ == '__main__':
 
     # play()
     makePrediction()
-
     # Visualizer.calculateLearningCurve(keptColumns)
     # Visualizer.calculateRocCurve()
-
-
     endTime = time.time()
     print("\nTotal run time:{}".format(endTime - startTime))
