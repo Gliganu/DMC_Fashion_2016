@@ -1,5 +1,5 @@
 import time
-
+import numpy as np
 import zaCode.ClassifierTrainer as ClassifierTrainer
 import zaCode.DatasetManipulator as Toolbox
 import zaCode.FileManager as FileManager
@@ -59,8 +59,7 @@ def serializeDataFrame():
 
 def constructDataFromScratch():
 
-    # data = FileManager.getRandomTrainingData(1000)
-    data = FileManager.getRandomTrainingData(50000)
+    data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
 
@@ -86,30 +85,79 @@ def constructDataFromScratch():
     # Perform feature engineering on existing features
     data = engineerOldFeatures(data)
 
-    # Construct polynomial features
-    # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
-    # data = Toolbox.constructPolynomialFeatures(data, polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
-
     return data
 
 
 
 
+def loadDataFrameFromCsv(fileName = 'allFeatures.csv', size = None):
+    data = FileManager.loadDataFrameFromCsv(fileName, size=size)
+
+    keptColumns = [     'colorCode',
+                        'quantity',
+                        'price',
+                        'rrp',
+                        'normalisedSizeCode',
+                        'voucherAmount',
+                        'overpriced',
+                        'discountedAmount',
+                        'orderDuplicatesCount',
+                        'articleIdSuffix',
+                        'itemPercentageReturned',
+                        'basketSize',
+                        'basketQuantity',
+                        'deviceID_1', 'deviceID_2','deviceID_3','deviceID_4','deviceID_5',
+                        'paymentMethod_BPLS','paymentMethod_BPPL','paymentMethod_BPRG','paymentMethod_CBA','paymentMethod_KGRG','paymentMethod_KKE','paymentMethod_NN','paymentMethod_PAYPALVC','paymentMethod_RG','paymentMethod_VORAUS',
+                        'weekday',
+                        'orderDate-month',
+                        'orderDate-day',
+
+                        'returnQuantity',
+                        'productGroup',
+                        'deviceID',
+                        'paymentMethod',
+                        'customerID',
+                        ]
+
+    data = Toolbox.filterColumns(data,keptColumns)
+    return data
+
 def makePrediction():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = FileManager.loadDataFrameFromCsv('allFeatures.csv')
+    data = loadDataFrameFromCsv()
+
+    # Construct polynomial features
+    # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
+
+    polynomialFeaturesSourceColumns = [     'colorCode',
+                                            'quantity',
+                                            'price',
+                                            'rrp',
+                                            'normalisedSizeCode',
+                                            'voucherAmount',
+                                            'overpriced',
+                                            'discountedAmount',
+                                            'orderDuplicatesCount',
+                                            'articleIdSuffix',
+                                            'itemPercentageReturned',
+                                            'basketSize',
+                                            'basketQuantity'
+                                    ]
+
+    # data = Toolbox.constructPolynomialFeatures(data,polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
     # construct the percentage return column
-    trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData, n_clusters=150)
+    # trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData, n_clusters=10)
     trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
     testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
 
-    # consturct median color/size per customer + difference
+
+    # construct median color/size per customer + difference
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
@@ -121,53 +169,64 @@ def makePrediction():
     xTrain, yTrain = Toolbox.getXandYMatrix(trainData, 'returnQuantity')
 
     # Select K best features according to variance
-    # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 40, trainData.columns)
+    # xTrain, selectedColumns = Toolbox.selectKBest(xTrain, yTrain, 65, trainData.columns)
     # testData = testData[selectedColumns].copy()
 
     # X and Y test
     xTest, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
 
-    # xTrain = Toolbox.normalize(xTrain)
-    # xTest = Toolbox.normalize(xTest)
-
     # apply PCA
-    # xTrain,xTest = Toolbox.performPCA(xTrain,xTest,10)
+    # xTrain,xTest = Toolbox.performPCA(xTrain,xTest,65)
 
     # apply RMB Transform ( + normalize and binarize )
     # xTrain,xTest = Toolbox.performRBMTransform(xTrain,xTest)
 
     # Training the classifier
-    # classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+
 
     # FileManager.saveModel(classifier, 'gliga/naiveBayes', 'GligaNaiveBayes.pkl')
-    logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
-    gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
-    randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
-    naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
+    #todo andrei
+    # logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
+    # gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
+    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+    # naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
 
-    # classifier = VotingClassifier(estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
+    # classifier = VotingClassifier(
+    # estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
     #                                           ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
     #                               voting='hard')
     # FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
 
     # Predicting
-    predictionMatrix = Toolbox.constructPredictionMatrix(xTest, logisticRegressionClassifier,
-                                                         gradientBoostingClassifier, randomForestClassifier,
-                                                         naiveBayesClassifier)
-    yPred = Toolbox.makeHardVoting(predictionMatrix)
+    # predictionMatrix = Toolbox.constructPredictionMatrix(xTest, logisticRegressionClassifier,
+    #                                                      gradientBoostingClassifier, randomForestClassifier,
+    #                                                      naiveBayesClassifier)
+    # yPred = Toolbox.makeHardVoting(predictionMatrix)
+    #todo end andrei
+
+    yPred = classifier.predict(xTest)
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)
-    # Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+
+
+def computeCorrelation():
+    # data = constructDataFromScratch()
+    data = loadDataFrameFromCsv(size = 50000)
+
+    print (data.corr)
 
 
 if __name__ == '__main__':
     startTime = time.time()
 
-    # makePrediction()
+    makePrediction()
     # serializeDataFrame()
+    # computeCorrelation()
 
-    Visualizer.calculateLearningCurve()
+    # Visualizer.calculateLearningCurve()
     # Visualizer.calculateRocCurve()
 
 
