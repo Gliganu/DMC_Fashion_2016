@@ -83,7 +83,9 @@ def makePrediction():
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     trainData = trainData.drop(['customerID'], 1)
+    trainData = trainData.drop(['voucherID'], 1)
     testData = testData.drop(['customerID'], 1)
+    testData = testData.drop(['voucherID'], 1)
 
     print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
 
