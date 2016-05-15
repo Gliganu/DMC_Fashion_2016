@@ -8,5 +8,7 @@ def performValidation(yPred, yTest):
 
     print("\nScore: {}".format(sum(abs(yPred - yTest))))
 
+    print("\nSquared error: {}".format( squared_err(yPred, yTest)))
+
 def squared_err(yPred, yTest):
     return brier_score_loss(yTest, yPred)

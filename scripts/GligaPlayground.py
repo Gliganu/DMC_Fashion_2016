@@ -111,7 +111,6 @@ def loadDataFrameFromCsv(fileName = 'allFeatures.csv', size = None):
                         'weekday',
                         'orderDate-month',
                         'orderDate-day',
-
                         'returnQuantity',
                         'productGroup',
                         'deviceID',
@@ -126,7 +125,7 @@ def makePrediction():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv()
+    data = loadDataFrameFromCsv(size = 100000)
 
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
@@ -151,14 +150,18 @@ def makePrediction():
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
-    # construct the percentage return column
-    # trainData, testData = Toolbox.constructPercentageReturnColumn(trainData, testData, n_clusters=10)
-    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
-    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
-
 
     # construct median color/size per customer + difference
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
+
+
+    # construct the percentage return column
+    trainData, _ = Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData)
+
+
+    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+
 
     trainData = trainData.drop(['customerID'], 1)
     testData = testData.drop(['customerID'], 1)
@@ -183,29 +186,12 @@ def makePrediction():
 
     # Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
-
-
-    # FileManager.saveModel(classifier, 'gliga/naiveBayes', 'GligaNaiveBayes.pkl')
-    #todo andrei
-    # logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
-    # gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
-    # randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
-    # naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
-
-    # classifier = VotingClassifier(
-    # estimators=[('lr', logisticRegressionClassifier), ('gb', gradientBoostingClassifier),
-    #                                           ('rf', randomForestClassifier), ('nb', naiveBayesClassifier)],
-    #                               voting='hard')
-    # FileManager.saveModel(classifier, 'gliga_full/lr1', 'logistic.pkl')
-
-    # Predicting
-    # predictionMatrix = Toolbox.constructPredictionMatrix(xTest, logisticRegressionClassifier,
-    #                                                      gradientBoostingClassifier, randomForestClassifier,
-    #                                                      naiveBayesClassifier)
-    # yPred = Toolbox.makeHardVoting(predictionMatrix)
-    #todo end andrei
-
     yPred = classifier.predict(xTest)
+
+    # yPred = Toolbox.predictUsingVotingClassifier(xTest)
+
+    # FileManager.saveModel(classifier,'withPercentage/gradientBoosting', 'gradientBoosting.pkl')
+
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)

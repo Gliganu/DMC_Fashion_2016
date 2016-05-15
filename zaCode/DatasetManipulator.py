@@ -519,41 +519,18 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
     return knownCustomerIdToPercentageReturnDict
 
 
-def constructPercentageReturnColumn(trainData, testData, n_clusters):
+def constructPercentageReturnColumnForSeenCustomers(trainData):
     print("Constructing Percentage Return Column....")
 
     trainDataCopy = trainData.copy()
-    testDataCopy = testData.copy()
-
-    # labelize the previously OHEed features
-    paymendEncoder = LabelEncoder()
-    deviceEncoder = LabelEncoder()
-
-    paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'], testDataCopy['paymentMethod']))
-    deviceEncoder.fit(np.append(trainDataCopy['deviceID'], testDataCopy['deviceID']))
-
-    trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
-    testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
-
-    trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
-    testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
-
-    clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
-    clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
 
     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
-    fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
-                                                                                   clusteringTestData,
-                                                                                   knownCustomerIdToPercentageReturnDict,
-                                                                                   n_clusters)
-
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
-        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
-        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+        lambda custId: knownCustomerIdToPercentageReturnDict[custId])
 
     return trainDataCopy, testDataCopy
+
 
 
 def constructBadPercentageReturnColumn(data):
@@ -577,6 +554,42 @@ def constructBadPercentageReturnColumn(data):
 
     return dataCopy
 
+#
+# def constructPercentageReturnColumn(trainData, testData, n_clusters):
+#     print("Constructing Percentage Return Column....")
+#
+#     trainDataCopy = trainData.copy()
+#     testDataCopy = testData.copy()
+#
+#     # labelize the previously OHEed features
+#     paymendEncoder = LabelEncoder()
+#     deviceEncoder = LabelEncoder()
+#
+#     paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'], testDataCopy['paymentMethod']))
+#     deviceEncoder.fit(np.append(trainDataCopy['deviceID'], testDataCopy['deviceID']))
+#
+#     trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
+#     testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
+#
+#     trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
+#     testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
+#
+#     clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
+#     clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
+#
+#     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
+#
+#     fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
+#                                                                                    clusteringTestData,
+#                                                                                    knownCustomerIdToPercentageReturnDict,
+#                                                                                    n_clusters)
+#
+#     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
+#         lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+#     testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
+#         lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+#
+#     return trainDataCopy, testDataCopy
 
 def scaleColumn(trainData, testData, columnName):
     colTrain = trainData[columnName].values.astype(float)
@@ -639,7 +652,7 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
     testDataCopy.loc[:, 'colorDifference'] = abs(testDataCopy['customerMedianColor'] - testDataCopy['colorCode'])
     testDataCopy.loc[:, 'sizeDifference'] = abs(testDataCopy['customerMedianSize'] - testDataCopy['normalisedSizeCode'])
 
-    return trainDataCopy, testDataCopy
+    return trainDataCopy, knownCustomerIdToPercentageReturnDict
 
 
 def constructItemPercentageReturnColumn(data):
@@ -772,6 +785,20 @@ def constructOrderDuplicatesDistinctSizeColumn(data):
     data['distinctSizeDuplicate'] = data.apply(lambda row: distinctSizeDict[(row['orderID'], row['articleID'])], axis=1)
     return dataCopy
 
+
+def predictUsingVotingClassifier(xTest):
+    logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
+    gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
+    randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+    naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
+
+    # Predicting
+    predictionMatrix = constructPredictionMatrix(xTest, logisticRegressionClassifier,
+                                                         gradientBoostingClassifier, randomForestClassifier,
+                                                         naiveBayesClassifier)
+    yPred = makeHardVoting(predictionMatrix)
+
+    return yPred
 
 def constructOverpricedColumn(data):
     data.loc[:, 'overpriced'] = data['price'] > data['rrp']

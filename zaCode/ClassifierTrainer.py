@@ -101,7 +101,7 @@ def trainClassifier(xTrain, yTrain):
     print("Training classifier...")
 
     # classifier = trainLogisticRegression(xTrain, yTrain)
-    # classifier = trainGradientBoostingClassifier(xTrain, yTrain)
+    classifier = trainGradientBoostingClassifier(xTrain, yTrain)
     # classifier = trainRandomForestClassifier(xTrain, yTrain)
     # classifier = trainNB(xTrain, yTrain)
     # classifier = trainSVM(xTrain, yTrain)
@@ -111,11 +111,13 @@ def trainClassifier(xTrain, yTrain):
     # max_depth = 4
     # max_features = 0.3
     # min_samples_leaf = 5
-    paramGrid = {
-      "n_estimators": [100, 150, 250, 400, 500],
-      "learning_rate": [0.05, 0.1, 0.25, 0.5],
-      "max_depth": [5, 10, 15, 20],
-      "min_samples_leaf": [1, 5, 10]
-    }
-    classifier = trainUsingGridSearch(GradientBoostingClassifier(), paramGrid, xTrain, yTrain)
+
+    # paramGrid = {
+    #   "n_estimators": [100, 150, 250, 400, 500],
+    #   "learning_rate": [0.05, 0.1, 0.25, 0.5],
+    #   "max_depth": [5, 10, 15, 20],
+    #   "min_samples_leaf": [1, 5, 10]
+    # }
+    # classifier = trainUsingGridSearch(GradientBoostingClassifier(), paramGrid, xTrain, yTrain)
+
     return classifier
