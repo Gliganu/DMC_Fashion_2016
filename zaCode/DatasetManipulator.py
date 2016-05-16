@@ -8,12 +8,12 @@ from collections import defaultdict
 from copy import copy
 from sklearn.cross_validation import train_test_split
 from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, LabelEncoder
-from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize,Binarizer,LabelEncoder
+from sklearn.preprocessing import Imputer, StandardScaler, PolynomialFeatures, normalize, Binarizer, MinMaxScaler
 from sklearn.decomposition import PCA
 from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
-from sklearn.cluster import KMeans
-
+from sklearn.cluster import KMeans,SpectralClustering,DBSCAN
 
 class DSetTransform:
     """ Class Performs data set transformations for preprocessing
@@ -380,7 +380,6 @@ def constructBasketColumns(data):
     data['basketSize'] = data['orderID'].apply(lambda id: dict_basket_size[id])
     data['basketQuantity'] = data['orderID'].apply(lambda id: dict_basket_total_quantity[id])
 
-    data = data.drop(['orderID'], 1)
     return data
 
 
@@ -432,16 +431,17 @@ def printNumberOfCustomersSeen(trainData, testData):
 
 
 def getCustomerClusteringDataFrame(data):
-    medianColumns = ['colorCode', 'productGroup', 'deviceID', 'paymentMethod']
+    # medianColumns = ['colorCode', 'productGroup', 'deviceID', 'paymentMethod']
     meanColumns = ['normalisedSizeCode', 'price', 'rrp', 'quantity']
 
-    medianData = data[medianColumns].groupby(data['customerID'])
+    # medianData = data[medianColumns].groupby(data['customerID'])
     meanData = data[meanColumns].groupby(data['customerID'])
 
-    dataMedianByCustomer = medianData.median()
+    # dataMedianByCustomer = medianData.agg(lambda x:x.value_counts().index[0])
     dataMeanByCustomer = meanData.mean()
 
-    clusteringTrainData = dataMedianByCustomer.join(dataMeanByCustomer)
+    # clusteringTrainData = dataMedianByCustomer.join(dataMeanByCustomer)
+    clusteringTrainData = dataMeanByCustomer
 
     return clusteringTrainData
 
@@ -456,8 +456,7 @@ def getKnownCustomerIDToPercentageReturnDict(trainData):
     dataByCustomer = trainDataCopy[['quantity', 'returnQuantity']].groupby(trainDataCopy['customerID'])
 
     dataSummedByCustomer = dataByCustomer.apply(sum)
-    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer[
-        'quantity'].apply(lambda x: max(1, x))
+    dataSummedByCustomer['percentageReturned'] = dataSummedByCustomer['returnQuantity'] / dataSummedByCustomer['quantity'].apply(lambda x: max(1, x))
 
     dataSummedByCustomer = dataSummedByCustomer.drop(['returnQuantity', 'quantity'], 1)
 
@@ -465,6 +464,13 @@ def getKnownCustomerIDToPercentageReturnDict(trainData):
 
     return customerIDtoPercentageReturnDict
 
+
+def getPercentageReturnForCustomerID(row,knownCustomerIdToPercentageReturnDict,clusterLabelToPercentageReturnDict):
+
+    if row.name in knownCustomerIdToPercentageReturnDict:
+        return knownCustomerIdToPercentageReturnDict[row.name]
+
+    return clusterLabelToPercentageReturnDict[row.clusterIndex]
 
 def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestData,
                                             knownCustomerIdToPercentageReturnDict, n_clusters):
@@ -482,8 +488,9 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
     trainDataCopy = clusteringTrainData.copy()
     trainDataCopy.loc[:, 'clusterIndex'] = labels
 
-    trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map(
-        (lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
+    # trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy.index.map((lambda custId: knownCustomerIdToPercentageReturnDict[custId]))
+    trainDataCopy.loc[:, 'percentageReturned'] =  trainDataCopy.apply(getPercentageReturnForCustomerID,knownCustomerIdToPercentageReturnDict = knownCustomerIdToPercentageReturnDict, clusterLabelToPercentageReturnDict = None, axis=1)
+
 
     clusterLabelToPercentageReturnDict = {}
 
@@ -495,15 +502,14 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
 
     print("Predicting clusters for customers....")
 
-    # todo for already seen customers do NOT predict !
 
     # predict in which cluster the entries in the test data will be
     predictedTestLabels = kMeans.predict(testDataCopy)
     testDataCopy.loc[:, 'clusterIndex'] = predictedTestLabels
 
-    # set the percReturn of that entry to the mean of that belonging cluster
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['clusterIndex'].apply(
-        lambda clusterIndex: clusterLabelToPercentageReturnDict[clusterIndex])
+    # set the percReturn of that entry to the mean of that belonging cluster in case we haven't seen him
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy.apply(getPercentageReturnForCustomerID,knownCustomerIdToPercentageReturnDict = knownCustomerIdToPercentageReturnDict, clusterLabelToPercentageReturnDict = clusterLabelToPercentageReturnDict,axis=1)
+
 
     testCustomerIdToPercentageReturnDict = testDataCopy.to_dict().get('percentageReturned')
 
@@ -513,41 +519,18 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
     return knownCustomerIdToPercentageReturnDict
 
 
-def constructPercentageReturnColumn(trainData, testData, n_clusters):
+def constructPercentageReturnColumnForSeenCustomers(trainData):
     print("Constructing Percentage Return Column....")
 
     trainDataCopy = trainData.copy()
-    testDataCopy = testData.copy()
-
-    # labelize the previously OHEed features
-    paymendEncoder = LabelEncoder()
-    deviceEncoder = LabelEncoder()
-
-    paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'], testDataCopy['paymentMethod']))
-    deviceEncoder.fit(np.append(trainDataCopy['deviceID'], testDataCopy['deviceID']))
-
-    trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
-    testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
-
-    trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
-    testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
-
-    clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
-    clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
 
     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
-    fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
-                                                                                   clusteringTestData,
-                                                                                   knownCustomerIdToPercentageReturnDict,
-                                                                                   n_clusters)
-
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
-        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
-    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
-        lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+        lambda custId: knownCustomerIdToPercentageReturnDict[custId])
 
     return trainDataCopy, testDataCopy
+
 
 
 def constructBadPercentageReturnColumn(data):
@@ -570,6 +553,68 @@ def constructBadPercentageReturnColumn(data):
     dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(lambda custId: idToPercDict[custId])
 
     return dataCopy
+
+#
+# def constructPercentageReturnColumn(trainData, testData, n_clusters):
+#     print("Constructing Percentage Return Column....")
+#
+#     trainDataCopy = trainData.copy()
+#     testDataCopy = testData.copy()
+#
+#     # labelize the previously OHEed features
+#     paymendEncoder = LabelEncoder()
+#     deviceEncoder = LabelEncoder()
+#
+#     paymendEncoder.fit(np.append(trainDataCopy['paymentMethod'], testDataCopy['paymentMethod']))
+#     deviceEncoder.fit(np.append(trainDataCopy['deviceID'], testDataCopy['deviceID']))
+#
+#     trainDataCopy['paymentMethod'] = paymendEncoder.transform(trainDataCopy['paymentMethod'])
+#     testDataCopy['paymentMethod'] = paymendEncoder.transform(testDataCopy['paymentMethod'])
+#
+#     trainDataCopy['deviceID'] = deviceEncoder.transform(trainDataCopy['deviceID'])
+#     testDataCopy['deviceID'] = deviceEncoder.transform(testDataCopy['deviceID'])
+#
+#     clusteringTrainData = getCustomerClusteringDataFrame(trainDataCopy)
+#     clusteringTestData = getCustomerClusteringDataFrame(testDataCopy)
+#
+#     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
+#
+#     fullCustomerIdToPercentageReturnDict = getFullCustomerIDToPercentageReturnDict(clusteringTrainData,
+#                                                                                    clusteringTestData,
+#                                                                                    knownCustomerIdToPercentageReturnDict,
+#                                                                                    n_clusters)
+#
+#     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
+#         lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+#     testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
+#         lambda custId: fullCustomerIdToPercentageReturnDict[custId])
+#
+#     return trainDataCopy, testDataCopy
+
+def scaleColumn(trainData, testData, columnName):
+    colTrain = trainData[columnName].values.astype(float)
+    colTest = testData[columnName].values.astype(float)
+    scaler = StandardScaler()
+    colTrainScaled = scaler.fit_transform(colTrain.reshape(-1, 1))
+    colTestScaled = scaler.transform(colTest.reshape(-1, 1))
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+    trainDataCopy.loc[:, [columnName]] = colTrainScaled
+    testDataCopy.loc[:, [columnName]] = colTestScaled
+    return (trainDataCopy, testDataCopy)
+
+
+def normalizeColumn(trainData, testData, columnName):
+    colTrain = trainData[columnName].values.astype(float)
+    colTest = testData[columnName].values.astype(float)
+    scaler = MinMaxScaler()
+    colTrainScaled = scaler.fit_transform(colTrain.reshape(-1, 1))
+    colTestScaled = scaler.transform(colTest.reshape(-1, 1))
+    trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
+    trainDataCopy.loc[:, [columnName]] = colTrainScaled
+    testDataCopy.loc[:, [columnName]] = colTestScaled
+    return (trainDataCopy, testDataCopy)
 
 
 def constructCustomerMedianSizeAndColor(trainData, testData):
@@ -607,7 +652,7 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
     testDataCopy.loc[:, 'colorDifference'] = abs(testDataCopy['customerMedianColor'] - testDataCopy['colorCode'])
     testDataCopy.loc[:, 'sizeDifference'] = abs(testDataCopy['customerMedianSize'] - testDataCopy['normalisedSizeCode'])
 
-    return trainDataCopy, testDataCopy
+    return trainDataCopy, knownCustomerIdToPercentageReturnDict
 
 
 def constructItemPercentageReturnColumn(data):
@@ -668,16 +713,16 @@ def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only
     newColumnsToBeDeleted = [featureName + "^1" for featureName in sourceFeatures]
     newColumnsDataFrame = newColumnsDataFrame.drop(newColumnsToBeDeleted, 1)
 
-    finalData = data.join(newColumnsDataFrame)
-
-    # todo one extra row added at the end. weird. to investigate
-    finalData = finalData.dropna()
+    finalData = data.reset_index().join(newColumnsDataFrame)
 
     return finalData
 
 
 def constructOrderDuplicatesCountColumn(data):
-    print("Constructing order duplicates count feature")
+    """
+    Creates a column with number of duplicate article ids for each order
+    """
+    print("Constructing order duplicates count feature...")
     dataCopy = data.copy()
     # select only columns of interest - orderID and articleID
     filtered = dataCopy.loc[:, ['orderID', 'articleID']]
@@ -697,7 +742,11 @@ def constructOrderDuplicatesCountColumn(data):
 
 
 def contructOrderDuplicatesDistinctColorColumn(data):
-    print("Constructing order duplicate with distinct color count feature")
+    """
+    Construct a column which is true for a row if the article id is duplicate in the given order and if the colors
+    of the duplicates are distinct
+    """
+    print("Constructing order duplicate with distinct color count feature...")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
     filteredOrderArticle = dataCopy.loc[:, ['orderID', 'articleID', 'colorCode']]
@@ -716,7 +765,11 @@ def contructOrderDuplicatesDistinctColorColumn(data):
 
 
 def constructOrderDuplicatesDistinctSizeColumn(data):
-    print("Constructing order duplicate with distinct size count feature")
+    """
+    Construct a column which is true for a row if the article id is duplicate in the given order and if the sizes
+    of the duplicates are distinct
+    """
+    print("Constructing order duplicate with distinct size count feature...")
     dataCopy = data.copy()
     # select only the columns we need for the feature construction
     filteredOrderArticle = dataCopy[['orderID', 'articleID', 'sizeCode']]
@@ -733,14 +786,17 @@ def constructOrderDuplicatesDistinctSizeColumn(data):
     return dataCopy
 
 
-def constructSizeProductColumn(data):
-    dataCopy = data.copy()
-    dataCopy['sizeProduct'] = dataCopy.apply(lambda row: str(row['sizeCode']) + 'x' + str(row['productGroup']), axis=1)
-    # dataCopy['sizeProduct'] = str(dataCopy['sizeCode']) + '/' + str(dataCopy['productGroup'])
-
-    return dataCopy
-
-
+def predictUsingVotingClassifier(xTest):
+    logisticRegressionClassifier = FileManager.loadModel('gliga/logisticRegression', 'GligaLogisticRegression.pkl')
+    gradientBoostingClassifier = FileManager.loadModel('gliga/gradientBoosting', 'GligaGradientBoosting.pkl')
+    randomForestClassifier = FileManager.loadModel('gliga/randomForest', 'GligaRandomForest.pkl')
+    naiveBayesClassifier = FileManager.loadModel('gliga/naiveBayes', 'GligaNaiveBayes.pkl')
+    # Predicting
+    predictionMatrix = constructPredictionMatrix(xTest, logisticRegressionClassifier,
+                                                         gradientBoostingClassifier, randomForestClassifier,
+                                                         naiveBayesClassifier)
+    yPred = makeHardVoting(predictionMatrix)
+    return yPred
 def constructOverpricedColumn(data):
     data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
@@ -765,6 +821,27 @@ def constructArticleIdSuffixColumn(data):
 
     return data
 
+
+def constructOrderNumberColumn(data):
+    print("Constructing order number feature...")
+    # remove order duplicates, we want each orderID to appear only once
+    dataNew = data.drop_duplicates('orderID')
+    groupedByCustomer = dataNew.loc[:, ['customerID', 'orderID']].groupby('customerID')
+    dict_order_number = {}
+    for name, group in groupedByCustomer:
+        count = 0
+        for index, row in group.iterrows():
+            dict_order_number[row['orderID']] = count
+            count += 1
+    dataCopy = data.copy()
+    dataCopy['orderNumber'] = data['orderID'].apply(lambda id: dict_order_number[id])
+    return dataCopy
+
+def constructHasVoucherColumn(data):
+    print("Constructing hasVoucher column...")
+    dataCopy = data.copy()
+    dataCopy['hasVoucher'] = dataCopy['voucherID'].apply(lambda v: 0 if v == 0 else 1)
+    return dataCopy
 
 def dropMissingValues(data):
     return data.dropna()
@@ -804,7 +881,7 @@ def selectKBest(xTrain, yTrain, k, columnNames):
     """
     Select the K best features based on the variance they have along the training set
     """
-    selector = SelectKBest(f_regression, k=k)  # k is number of features.
+    selector = SelectKBest(f_classif, k=k)  # k is number of features.
     newXTrain = selector.fit_transform(xTrain, yTrain)
 
     # print the remaining features
@@ -833,13 +910,16 @@ def getXandYMatrix(data, predictionColumnName):
     return X, y
 
 
-def scaleMatrix(dataMatrix):
+def scaleMatrix(trainMatrix, testMatrix):
     """
     Scales all the columns in the matrix
     """
 
     scaler = StandardScaler()
-    return scaler.fit_transform(dataMatrix)
+    trainScaled = scaler.fit_transform(trainMatrix)
+    testScaled = scaler.transform(testMatrix)
+    return trainScaled, testScaled
+
 
 
 def normalizeMatrix(dataMatrix):
@@ -896,8 +976,8 @@ def performRBMTransform(xTrain, xTest):
     xTrain = normalize(xTrain)
     xTest = normalize(xTest)
 
-    # xTrain = binarizeMatrix(xTrain,0.5)
-    # xTest = binarizeMatrix(xTest,0.5)
+    xTrain = binarizeMatrix(xTrain,0.5)
+    xTest = binarizeMatrix(xTest,0.5)
 
     rmb = BernoulliRBM(verbose=True)
 

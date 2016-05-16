@@ -1,9 +1,5 @@
 from sklearn import metrics
-import numpy as np
-from sklearn.metrics import accuracy_score,recall_score,precision_score,f1_score
-
-
-import matplotlib.pyplot as plt
+from sklearn.metrics import brier_score_loss
 
 def performValidation(yPred, yTest):
     print(metrics.classification_report(yPred, yTest))
@@ -11,3 +7,8 @@ def performValidation(yPred, yTest):
     print("\nNumber of test entries: {}".format(len(yTest)))
 
     print("\nScore: {}".format(sum(abs(yPred - yTest))))
+
+    print("\nSquared error: {}".format( squared_err(yPred, yTest)))
+
+def squared_err(yPred, yTest):
+    return brier_score_loss(yTest, yPred)
