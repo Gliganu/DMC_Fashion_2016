@@ -9,6 +9,7 @@ import pandas as pd
 from sklearn.ensemble import VotingClassifier
 from zaCode import TestPredictor
 
+
 def addNewFeatures(data):
     data = Toolbox.constructOverpricedColumn(data)
 
@@ -50,15 +51,14 @@ def engineerOldFeatures(data):
 
 
 def serializeDataFrame():
-
-    fileName =  'allFeatures.csv'
+    fileName = 'allFeatures.csv'
 
     data = constructDataFromScratch()
 
-    FileManager.saveDataFrame(data,fileName)
+    FileManager.saveDataFrame(data, fileName)
+
 
 def constructDataFromScratch():
-
     data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
@@ -88,80 +88,77 @@ def constructDataFromScratch():
     return data
 
 
-
-
-def loadDataFrameFromCsv(fileName = 'allFeatures.csv', size = None):
+def loadDataFrameFromCsv(fileName='allFeatures.csv', size=None):
     data = FileManager.loadDataFrameFromCsv(fileName, size=size)
 
-    keptColumns = [     'colorCode',
-                        'quantity',
-                        'price',
-                        'rrp',
-                        'normalisedSizeCode',
-                        'voucherAmount',
-                        'overpriced',
-                        'discountedAmount',
-                        'orderDuplicatesCount',
-                        'articleIdSuffix',
-                        'itemPercentageReturned',
-                        'basketSize',
-                        'basketQuantity',
-                        'deviceID_1', 'deviceID_2','deviceID_3','deviceID_4','deviceID_5',
-                        'paymentMethod_BPLS','paymentMethod_BPPL','paymentMethod_BPRG','paymentMethod_CBA','paymentMethod_KGRG','paymentMethod_KKE','paymentMethod_NN','paymentMethod_PAYPALVC','paymentMethod_RG','paymentMethod_VORAUS',
-                        'weekday',
-                        'orderDate-month',
-                        'orderDate-day',
-                        'returnQuantity',
-                        'productGroup',
-                        'deviceID',
-                        'paymentMethod',
-                        'customerID',
-                        ]
+    keptColumns = ['colorCode',
+                   'quantity',
+                   'price',
+                   'rrp',
+                   'normalisedSizeCode',
+                   'voucherAmount',
+                   'overpriced',
+                   'discountedAmount',
+                   'orderDuplicatesCount',
+                   'articleIdSuffix',
+                   'itemPercentageReturned',
+                   'basketSize',
+                   'basketQuantity',
+                   'deviceID_1', 'deviceID_2', 'deviceID_3', 'deviceID_4', 'deviceID_5',
+                   'paymentMethod_BPLS', 'paymentMethod_BPPL', 'paymentMethod_BPRG', 'paymentMethod_CBA',
+                   'paymentMethod_KGRG', 'paymentMethod_KKE', 'paymentMethod_NN', 'paymentMethod_PAYPALVC',
+                   'paymentMethod_RG', 'paymentMethod_VORAUS',
+                   'weekday',
+                   'orderDate-month',
+                   'orderDate-day',
+                   'returnQuantity',
+                   'productGroup',
+                   'deviceID',
+                   'paymentMethod',
+                   'customerID',
+                   ]
 
-    data = Toolbox.filterColumns(data,keptColumns)
+    data = Toolbox.filterColumns(data, keptColumns)
     return data
+
 
 def makePrediction():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size = 100000)
+    data = loadDataFrameFromCsv(size=100000)
 
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
 
-    polynomialFeaturesSourceColumns = [     'colorCode',
-                                            'quantity',
-                                            'price',
-                                            'rrp',
-                                            'normalisedSizeCode',
-                                            'voucherAmount',
-                                            'overpriced',
-                                            'discountedAmount',
-                                            'orderDuplicatesCount',
-                                            'articleIdSuffix',
-                                            'itemPercentageReturned',
-                                            'basketSize',
-                                            'basketQuantity'
-                                    ]
+    polynomialFeaturesSourceColumns = ['colorCode',
+                                       'quantity',
+                                       'price',
+                                       'rrp',
+                                       'normalisedSizeCode',
+                                       'voucherAmount',
+                                       'overpriced',
+                                       'discountedAmount',
+                                       'orderDuplicatesCount',
+                                       'articleIdSuffix',
+                                       'itemPercentageReturned',
+                                       'basketSize',
+                                       'basketQuantity'
+                                       ]
 
     # data = Toolbox.constructPolynomialFeatures(data,polynomialFeaturesSourceColumns,degree=2, interaction_only=False)
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
-
     # construct median color/size per customer + difference
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
-
     # construct the percentage return column
-    trainData, _ ,_= Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData,testData)
-
+    trainData, _, _ = Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData, testData)
 
     trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
     testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
-
 
     trainData = trainData.drop(['customerID'], 1)
     testData = testData.drop(['customerID'], 1)
@@ -195,14 +192,15 @@ def makePrediction():
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)
-    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,
+                                     [col for col in trainData.columns if col != 'returnQuantity'])
 
 
 def makePredictionUsingDoubleClassifiers():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size = 1000)
+    data = loadDataFrameFromCsv(size=1000)
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
@@ -211,9 +209,10 @@ def makePredictionUsingDoubleClassifiers():
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
 
     # construct the percentage return column
-    trainDataExtra,testData, customerIDToPercReturnedDict = Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData,testData)
+    trainDataExtra, testData, customerIDToPercReturnedDict = Toolbox.constructPercentageReturnColumnForSeenCustomers(
+        trainData, testData)
 
-    trainDataExtra = trainDataExtra.drop(['productGroup', 'deviceID', 'paymentMethod','customerID'], 1)
+    trainDataExtra = trainDataExtra.drop(['productGroup', 'deviceID', 'paymentMethod', 'customerID'], 1)
     trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod', 'customerID'], 1)
     testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
 
@@ -228,8 +227,10 @@ def makePredictionUsingDoubleClassifiers():
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
     classifierExtra = ClassifierTrainer.trainClassifier(xTrainExtra, yTrain)
 
-    #todo SILVI
-    yPred = TestPredictor.makePrediction(classifier,classifierExtra,testData,customerIDToPercReturnedDict)
+    # todo SILVI
+    yPred = TestPredictor.makePrediction(classifier, classifierExtra, testData, customerIDToPercReturnedDict,
+                                         ['customerID', 'percentageReturned', 'returnQuantity'],
+                                         ['customerID', 'returnQuantity'])
 
     # yPred = classifier.predict(xTest)
     # yPred = Toolbox.predictUsingVotingClassifier(xTest)
@@ -238,8 +239,8 @@ def makePredictionUsingDoubleClassifiers():
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)
-    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
-
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,
+                                     [col for col in trainData.columns if col != 'returnQuantity'])
 
 
 if __name__ == '__main__':

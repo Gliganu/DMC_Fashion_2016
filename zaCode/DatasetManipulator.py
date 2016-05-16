@@ -308,6 +308,7 @@ def clusterRetQtyGTOne(rawData):
 
 
 def normalizeSize(data):
+    # TODO: add a new column for normlised size and keep the old one as well
     """
         returns data with sizeCode col normalised to best represent real clothing size
         note: renames column as normalisedSizeCode to prevent conflicts
@@ -533,7 +534,7 @@ def constructPercentageReturnColumnForSeenCustomers(trainData,testData):
     testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
         lambda custId: knownCustomerIdToPercentageReturnDict[custId] if custId in knownCustomerIdToPercentageReturnDict else -1)
 
-    return trainDataCopy, knownCustomerIdToPercentageReturnDict
+    return trainDataCopy, testDataCopy, knownCustomerIdToPercentageReturnDict
 
 
 
@@ -832,14 +833,41 @@ def constructOrderNumberColumn(data):
     dataNew = data.drop_duplicates('orderID')
     groupedByCustomer = dataNew.loc[:, ['customerID', 'orderID']].groupby('customerID')
     dict_order_number = {}
+    dict_customer_order_count = {}
     for name, group in groupedByCustomer:
         count = 0
         for index, row in group.iterrows():
             dict_order_number[row['orderID']] = count
             count += 1
+        dict_customer_order_count[name] = count
     dataCopy = data.copy()
     dataCopy['orderNumber'] = data['orderID'].apply(lambda id: dict_order_number[id])
-    return dataCopy
+    return (dataCopy, dict_customer_order_count)
+
+
+def constructOrderNumberColumnTest(data, dict_customer_order_count):
+    print("Constructing order number feature for test data...")
+    # remove order duplicates, we want each orderID to appear only once
+    dataNew = data.drop_duplicates('orderID')
+    groupedByCustomer = dataNew.loc[:, ['customerID', 'orderID']].groupby('customerID')
+    dict_order_number = {}
+    dict_customer_order_count = {}
+
+    for name, group in groupedByCustomer:
+        if name in dict_customer_order_count:
+            count = dict_customer_order_count[name]
+        else:
+            count = 0
+
+        for index, row in group.iterrows():
+            dict_order_number[row['orderID']] = count
+            count += 1
+        dict_customer_order_count[name] = count
+    dataCopy = data.copy()
+    dataCopy['orderNumber'] = data['orderID'].apply(lambda id: dict_order_number[id])
+    return (dataCopy, dict_customer_order_count)
+
+
 
 def constructHasVoucherColumn(data):
     print("Constructing hasVoucher column...")
