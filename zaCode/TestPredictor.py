@@ -1,6 +1,6 @@
 import pandas as pd
 import zaCode.Postprocesser as postprocesser
-import FileManager as filemanager
+import zaCode.FileManager as filemanager
 
 def makePrediction(classifierSeenCl, classifierUnseenCl, test, customerDict):
     testForSeen = test.drop(['orderID', 'articleID'], 1)

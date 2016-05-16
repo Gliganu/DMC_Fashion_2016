@@ -519,17 +519,21 @@ def getFullCustomerIDToPercentageReturnDict(clusteringTrainData, clusteringTestD
     return knownCustomerIdToPercentageReturnDict
 
 
-def constructPercentageReturnColumnForSeenCustomers(trainData):
+def constructPercentageReturnColumnForSeenCustomers(trainData,testData):
     print("Constructing Percentage Return Column....")
 
     trainDataCopy = trainData.copy()
+    testDataCopy = testData.copy()
 
     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
         lambda custId: knownCustomerIdToPercentageReturnDict[custId])
 
-    return trainDataCopy, testDataCopy
+    testDataCopy.loc[:, 'percentageReturned'] = testDataCopy['customerID'].apply(
+        lambda custId: knownCustomerIdToPercentageReturnDict[custId] if custId in knownCustomerIdToPercentageReturnDict else -1)
+
+    return trainDataCopy, knownCustomerIdToPercentageReturnDict
 
 
 
@@ -652,7 +656,7 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
     testDataCopy.loc[:, 'colorDifference'] = abs(testDataCopy['customerMedianColor'] - testDataCopy['colorCode'])
     testDataCopy.loc[:, 'sizeDifference'] = abs(testDataCopy['customerMedianSize'] - testDataCopy['normalisedSizeCode'])
 
-    return trainDataCopy, knownCustomerIdToPercentageReturnDict
+    return trainDataCopy, testDataCopy
 
 
 def constructItemPercentageReturnColumn(data):
