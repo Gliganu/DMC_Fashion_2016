@@ -7,7 +7,7 @@ import zaCode.Validator as Validator
 from zaCode import Visualizer
 import pandas as pd
 from sklearn.ensemble import VotingClassifier
-
+from zaCode import TestPredictor
 
 def addNewFeatures(data):
     data = Toolbox.constructOverpricedColumn(data)
@@ -156,7 +156,7 @@ def makePrediction():
 
 
     # construct the percentage return column
-    trainData, _ = Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData)
+    trainData, _ ,_= Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData,testData)
 
 
     trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
@@ -198,19 +198,56 @@ def makePrediction():
     Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
 
 
-def computeCorrelation():
-    # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size = 50000)
+def makePredictionUsingDoubleClassifiers():
+    print("Reading data...")
 
-    print (data.corr)
+    # data = constructDataFromScratch()
+    data = loadDataFrameFromCsv(size = 1000)
+
+    # Split into train/test data
+    trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
+
+    # construct median color/size per customer + difference
+    trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
+
+    # construct the percentage return column
+    trainDataExtra,testData, customerIDToPercReturnedDict = Toolbox.constructPercentageReturnColumnForSeenCustomers(trainData,testData)
+
+    trainDataExtra = trainDataExtra.drop(['productGroup', 'deviceID', 'paymentMethod','customerID'], 1)
+    trainData = trainData.drop(['productGroup', 'deviceID', 'paymentMethod', 'customerID'], 1)
+    testData = testData.drop(['productGroup', 'deviceID', 'paymentMethod'], 1)
+
+    print("\n\nFinal columns {} : {}".format(len(trainData.columns), trainData.columns))
+
+    # X and Y train
+    xTrain, yTrain = Toolbox.getXandYMatrix(trainData, 'returnQuantity')
+    xTrainExtra, _ = Toolbox.getXandYMatrix(trainDataExtra, 'returnQuantity')
+    _, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
+
+    # Training the classifier
+    classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
+    classifierExtra = ClassifierTrainer.trainClassifier(xTrainExtra, yTrain)
+
+    #todo SILVI
+    yPred = TestPredictor.makePrediction(classifier,classifierExtra,testData,customerIDToPercReturnedDict)
+
+    # yPred = classifier.predict(xTest)
+    # yPred = Toolbox.predictUsingVotingClassifier(xTest)
+
+    # FileManager.saveModel(classifier,'withPercentage/gradientBoosting', 'gradientBoosting.pkl')
+
+    # Assessing the performance
+    Validator.performValidation(yPred, yTest)
+    Visualizer.plotFeatureImportance(classifier.feature_importances_,[col for col in trainData.columns if col != 'returnQuantity'])
+
 
 
 if __name__ == '__main__':
     startTime = time.time()
 
-    makePrediction()
+    # makePrediction()
+    makePredictionUsingDoubleClassifiers()
     # serializeDataFrame()
-    # computeCorrelation()
 
     # Visualizer.calculateLearningCurve()
     # Visualizer.calculateRocCurve()
