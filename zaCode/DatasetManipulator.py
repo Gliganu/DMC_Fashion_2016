@@ -733,6 +733,14 @@ def constructOrderDuplicatesDistinctSizeColumn(data):
     return dataCopy
 
 
+def constructSizeProductColumn(data):
+    dataCopy = data.copy()
+    dataCopy['sizeProduct'] = dataCopy.apply(lambda row: str(row['sizeCode']) + 'x' + str(row['productGroup']), axis=1)
+    # dataCopy['sizeProduct'] = str(dataCopy['sizeCode']) + '/' + str(dataCopy['productGroup'])
+
+    return dataCopy
+
+
 def constructOverpricedColumn(data):
     data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
