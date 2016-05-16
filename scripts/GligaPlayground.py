@@ -200,7 +200,7 @@ def makePredictionUsingDoubleClassifiers():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size=1000)
+    data = loadDataFrameFromCsv(size=100000)
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
