@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
 from sklearn.cluster import KMeans,SpectralClustering,DBSCAN
+import zaCode.Validator as Validator
 
 class DSetTransform:
     """ Class Performs data set transformations for preprocessing
@@ -802,6 +803,8 @@ def predictUsingVotingClassifier(xTest):
                                                          naiveBayesClassifier)
     yPred = makeHardVoting(predictionMatrix)
     return yPred
+
+
 def constructOverpricedColumn(data):
     data.loc[:, 'overpriced'] = data['price'] > data['rrp']
 
@@ -1037,3 +1040,9 @@ def makeHardVoting(predictionMatrix):
     nrOfClassifiers = predictionMatrix.shape[0]
     majorityFunc = np.vectorize(lambda arg: 1. if arg >= (nrOfClassifiers / 2.0) else 0.)
     return majorityFunc(sumPrediction)
+
+
+def getIndividualClassifierScores(yTest, predictionMatrix):
+    for index, row in predictionMatrix.iterrows():
+        yPred = pd.Series.to_frame(row)
+        Validator.performValidation(yPred, pd.DataFrame.transpose(yTest))
