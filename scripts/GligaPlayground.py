@@ -8,6 +8,7 @@ from zaCode import Visualizer
 import pandas as pd
 from sklearn.ensemble import VotingClassifier
 from zaCode import TestPredictor
+from sklearn.cross_validation import train_test_split
 
 
 def addNewFeatures(data):
@@ -24,7 +25,7 @@ def addNewFeatures(data):
     data = Toolbox.constructArticleIdSuffixColumn(data)
     # data = data.drop(['articleID'],1)
 
-    data = Toolbox.constructItemPercentageReturnColumn(data)
+    # data = Toolbox.constructItemPercentageReturnColumn(data)
 
     data = Toolbox.constructBasketColumns(data)
     # data = data.drop(['orderID'], 1)
@@ -51,33 +52,36 @@ def engineerOldFeatures(data):
 
 
 def serializeDataFrame():
-    fileName = 'allFeatures.csv'
+    fileName =  'allFeatures_Test.csv'
 
     data = constructDataFromScratch()
 
     FileManager.saveDataFrame(data, fileName)
 
 
-def constructDataFromScratch():
-    data = FileManager.getRandomTrainingData(1000)
+    # data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
+    data = FileManager.getTestData()
 
-    allDistinctOHEdata = FileManager.getDistinctOHEFeatures()
-    data = pd.concat([data, allDistinctOHEdata], axis=0)
+    # allDistinctOHEdata = FileManager.getDistinctOHEFeatures()
+    # data = pd.concat([data, allDistinctOHEdata], axis=0)
 
     keptColumns = ['orderDate', 'orderID', 'colorCode', 'quantity', 'price', 'rrp', 'deviceID', 'paymentMethod',
                    'productGroup',
-                   'sizeCode', 'voucherAmount', 'customerID', 'articleID', 'returnQuantity']
+                   'sizeCode', 'voucherAmount', 'customerID', 'articleID',
+                   # 'returnQuantity'
+                   ]
 
     # Keep just the columns of interest
     data = Toolbox.filterColumns(data, keptColumns)
 
     # Restrict prediction to 0/1 for now. Map everything greater than 1 to 1
-    data = Toolbox.restrictReturnQuantityToBinaryChoice(data)
+    # data = Toolbox.restrictReturnQuantityToBinaryChoice(data)
 
     # Handle missing values
-    data = Toolbox.dropMissingValues(data)
+    # data = Toolbox.dropMissingValues(data)
+    data = Toolbox.fillMissingValues(data)
 
     # Construct additional features
     data = addNewFeatures(data)
@@ -125,8 +129,8 @@ def loadDataFrameFromCsv(fileName='allFeatures.csv', size=None):
 def makePrediction():
     print("Reading data...")
 
-    # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size=100000)
+    data = constructDataFromScratch()
+    # data = loadDataFrameFromCsv(size = 100000)
 
     # Construct polynomial features
     # polynomialFeaturesSourceColumns = ['quantity', 'price', 'voucherAmount', 'basketQuantity', 'itemPercentageReturned', 'overpriced', 'discountedAmount']
@@ -247,8 +251,8 @@ if __name__ == '__main__':
     startTime = time.time()
 
     # makePrediction()
-    makePredictionUsingDoubleClassifiers()
-    # serializeDataFrame()
+    # makePredictionUsingDoubleClassifiers()
+    serializeDataFrame()
 
     # Visualizer.calculateLearningCurve()
     # Visualizer.calculateRocCurve()

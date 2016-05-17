@@ -884,12 +884,15 @@ def fillMissingValues(data, productGroupStategy='median', rrpStrategy='mean'):
     Fills the missing values in the columns which suffer from this.
     """
 
-    productGroupImputer = Imputer(missing_values='NaN', strategy=productGroupStategy)
-    data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
+    # productGroupImputer = Imputer(missing_values='NaN', strategy=productGroupStategy)
+    # data['productGroup'] = productGroupImputer.fit_transform(data['productGroup'])
+    #
+    # rrpImputer = Imputer(missing_values='NaN', strategy=rrpStrategy)
+    # data['rrp'] = rrpImputer.fit_transform(data['rrp'])
 
-    rrpImputer = Imputer(missing_values='NaN', strategy=rrpStrategy)
-    data['rrp'] = rrpImputer.fit_transform(data['rrp'])
-
+    print("Before")
+    data.fillna(0)
+    print("after  ")
     # for the voucher ID column, 6 values missing. drop them
     data = dropMissingValues(data)
 
