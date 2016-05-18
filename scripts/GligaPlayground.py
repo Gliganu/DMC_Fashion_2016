@@ -218,7 +218,6 @@ def makePredictionUsingDoubleClassifiers():
 
     # data = constructDataFromScratch()
     trainData = loadDataFrameFromCsv()
-    trainData = trainData.drop(['paymentMethod_RG'], 1)
 
     testData = FileManager.loadDataFrameFromCsv("allFeatures_Test_Full.csv")
     testData = testData.drop(['orderID'], 1)
@@ -246,6 +245,10 @@ def makePredictionUsingDoubleClassifiers():
     xTrainExtra, _ = Toolbox.getXandYMatrix(trainDataExtra, 'returnQuantity')
     # _, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
 
+    FileManager.saveDataFrame(trainDataExtra,"trainDataExtra.csv")
+    FileManager.saveDataFrame(trainData,"trainData.csv")
+    FileManager.saveDataFrame(testData,"testData.csv")
+
     # Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
     classifierExtra = ClassifierTrainer.trainClassifier(xTrainExtra, yTrain)
@@ -272,13 +275,45 @@ def makePredictionUsingDoubleClassifiers():
 
 
 
+def makePredFromSerializedData():
+
+    classifierExtra = FileManager.loadModel('withPercentage/gradientBoosting', 'gradientBoosting.pkl')
+    classifier = FileManager.loadModel('withoutPercentage/gradientBoosting', 'gradientBoosting.pkl')
+
+    testData = FileManager.loadDataFrameFromCsv("testData.csv")
+
+    customerIDToPercReturnedDict = joblib.load('../models/itemPercDict/itemPercDict.pkl')
+
+    testData = testData.fillna(0)
+
+    # todo SILVI
+    yPred = TestPredictor.makePrediction(classifier, classifierExtra, testData, customerIDToPercReturnedDict,
+                                         # ['customerID', 'percentageReturned', 'returnQuantity'],
+                                         ['customerID', 'percentageReturned', 'articleID'],
+                                         # ['customerID', 'returnQuantity']
+                                         ['customerID', 'articleID']  # no return quantity in real test set
+                                         )
+
+
+def finalFinalFinal():
+    finalSubmit = FileManager.loadDataFrameFromCsv("finalSubmit.csv")
+    orders_class = FileManager.getTestData()
+
+    superFinalPrediction = Toolbox.finalConcat(orders_class,finalSubmit,'prediction')
+
+    superFinalPrediction.to_csv('../dataframes/superFinalPrediction', sep=';', index=False)
+
+
 
 if __name__ == '__main__':
     startTime = time.time()
 
     # makePrediction()
-    makePredictionUsingDoubleClassifiers()
+    # makePredictionUsingDoubleClassifiers()
     # serializeDataFrame()
+    # makePredFromSerializedData()
+
+    finalFinalFinal()
 
     # constructItemPercetageReturnDict()
 

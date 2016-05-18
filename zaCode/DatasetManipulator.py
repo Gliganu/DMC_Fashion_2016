@@ -15,6 +15,10 @@ from sklearn.neural_network.rbm import BernoulliRBM
 import zaCode.FileManager as FileManager
 from sklearn.cluster import KMeans,SpectralClustering,DBSCAN
 import zaCode.Validator as Validator
+from sklearn.externals import joblib
+from zaCode.Postprocesser import  postprocess
+import os
+
 
 class DSetTransform:
     """ Class Performs data set transformations for preprocessing
@@ -527,9 +531,15 @@ def constructPercentageReturnColumnForSeenCustomers(trainData,testData):
     trainDataCopy = trainData.copy()
     testDataCopy = testData.copy()
 
-    knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
+    # knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
-    
+    knownCustomerIdToPercentageReturnDict = joblib.load('../models/custIdToPercRet/custIdToPercRet.pkl')
+
+    # if not os.path.exists('../models/custIdToPercRet'):
+    #     os.makedirs('../models/custIdToPercRet')
+    #
+    # joblib.dump(knownCustomerIdToPercentageReturnDict, '../models/custIdToPercRet/custIdToPercRet.pkl')
+    #
 
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
         lambda custId: knownCustomerIdToPercentageReturnDict[custId])
@@ -1065,3 +1075,14 @@ def getIndividualClassifierScores(yTest, predictionMatrix):
     for index, row in predictionMatrix.iterrows():
         yPred = pd.Series.to_frame(row)
         Validator.performValidation(yPred, pd.DataFrame.transpose(yTest))
+
+
+def finalConcat(orders_class, pred_dset, pred_col):
+    dset_tmp =  pd.concat([orders_class, pred_dset[pred_col]], axis = 1)
+    dset_final = postprocess(dset_tmp)
+
+    dset_final = dset_final[['orderID', 'articleID', 'colorCode', 'sizeCode', pred_col]]
+
+    dset_final['prediction'] = dset_final['prediction'].apply(lambda x: int(x))
+
+    return dset_final

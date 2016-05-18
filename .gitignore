@@ -33,3 +33,5 @@ dataframes
 %HOMEDRIVE%%HOMEPATH%
 .ipynb_checkpoints
 *.pyc
+models/withPercentage
+models/withoutPercentage

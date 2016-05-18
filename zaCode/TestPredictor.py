@@ -4,7 +4,7 @@ import zaCode.FileManager as filemanager
 import zaCode.DatasetManipulator as DatasetManipulator
 
 
-def makePrediction(classifierUnseenCl, classifierSeenCl, test, customerDict, dropUnseen, dropSeen):
+def     makePrediction(classifierUnseenCl, classifierSeenCl, test, customerDict, dropUnseen, dropSeen):
     testWithPred = test.copy()
 
     seen = 0
