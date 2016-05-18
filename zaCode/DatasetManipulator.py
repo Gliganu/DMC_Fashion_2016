@@ -660,6 +660,15 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
 
     return trainDataCopy, testDataCopy
 
+def constructItemPercentageBasedOnDict(data, idToPercDict):
+
+    dataCopy = data.copy()
+
+    dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(
+
+        lambda custId: idToPercDict[custId] if custId in idToPercDict else 0)
+
+    return dataCopy
 
 def constructItemPercentageReturnColumn(data):
     print("Constructing ItemPercentageReturn feature....")
@@ -678,9 +687,9 @@ def constructItemPercentageReturnColumn(data):
 
     dataCopy.loc[:, 'itemPercentageReturned'] = data['articleID'].apply(lambda custId: idToPercDict[custId])
 
-    dataCopy = dataCopy.drop(['articleID'], 1)
+    # dataCopy = dataCopy.drop(['articleID'], 1)
 
-    return dataCopy
+    return dataCopy,idToPercDict
 
 
 def constructPolynomialFeatures(data, sourceFeatures, degree=1, interaction_only=True, include_bias=False):

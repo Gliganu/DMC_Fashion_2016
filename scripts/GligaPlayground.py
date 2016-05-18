@@ -9,6 +9,8 @@ import pandas as pd
 from sklearn.ensemble import VotingClassifier
 from zaCode import TestPredictor
 from sklearn.cross_validation import train_test_split
+from sklearn.externals import joblib
+import os
 
 
 def addNewFeatures(data):
@@ -26,6 +28,7 @@ def addNewFeatures(data):
     # data = data.drop(['articleID'],1)
 
     # data = Toolbox.constructItemPercentageReturnColumn(data)
+    data = Toolbox.constructItemPercentageBasedOnDict(data,  joblib.load('../models/itemPercDict/itemPercDict.pkl'))
 
     data = Toolbox.constructBasketColumns(data)
     # data = data.drop(['orderID'], 1)
@@ -58,7 +61,18 @@ def serializeDataFrame():
 
     FileManager.saveDataFrame(data, fileName)
 
+def constructItemPercetageReturnDict():
 
+    data = FileManager.getWholeTrainingData()
+    data, idToPercDict = Toolbox.constructItemPercentageReturnColumn(data)
+
+    if not os.path.exists('../models/itemPercDict'):
+        os.makedirs('../models/itemPercDict')
+
+    joblib.dump(idToPercDict, '../models/itemPercDict/itemPercDict.pkl')
+
+
+def constructDataFromScratch():
     # data = FileManager.getRandomTrainingData(1000)
     # data = FileManager.get10kTrainingData()
     # data = FileManager.getWholeTrainingData()
@@ -204,7 +218,7 @@ def makePredictionUsingDoubleClassifiers():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size=100000)
+    data = loadDataFrameFromCsv(size=0.75)
 
     # Split into train/test data
     trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
@@ -243,16 +257,20 @@ def makePredictionUsingDoubleClassifiers():
 
     # Assessing the performance
     Validator.performValidation(yPred, yTest)
-    Visualizer.plotFeatureImportance(classifier.feature_importances_,
-                                     [col for col in trainData.columns if col != 'returnQuantity'])
+    # Visualizer.plotFeatureImportance(classifier.feature_importances_,
+    #                                  [col for col in trainData.columns if col != 'returnQuantity'])
+
+
 
 
 if __name__ == '__main__':
     startTime = time.time()
 
     # makePrediction()
-    # makePredictionUsingDoubleClassifiers()
-    serializeDataFrame()
+    makePredictionUsingDoubleClassifiers()
+    # serializeDataFrame()
+
+    # constructItemPercetageReturnDict()
 
     # Visualizer.calculateLearningCurve()
     # Visualizer.calculateRocCurve()
