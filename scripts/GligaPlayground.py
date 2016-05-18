@@ -28,7 +28,6 @@ def addNewFeatures(data):
     # data = data.drop(['articleID'],1)
 
     # data = Toolbox.constructItemPercentageReturnColumn(data)
-    data = Toolbox.constructItemPercentageBasedOnDict(data,  joblib.load('../models/itemPercDict/itemPercDict.pkl'))
 
     data = Toolbox.constructBasketColumns(data)
     # data = data.drop(['orderID'], 1)
@@ -55,7 +54,7 @@ def engineerOldFeatures(data):
 
 
 def serializeDataFrame():
-    fileName =  'allFeatures_Test.csv'
+    fileName =  'allFeatures_Test_Full.csv'
 
     data = constructDataFromScratch()
 
@@ -218,10 +217,16 @@ def makePredictionUsingDoubleClassifiers():
     print("Reading data...")
 
     # data = constructDataFromScratch()
-    data = loadDataFrameFromCsv(size=0.75)
+    trainData = loadDataFrameFromCsv()
+    trainData = trainData.drop(['paymentMethod_RG'], 1)
+
+    testData = FileManager.loadDataFrameFromCsv("allFeatures_Test_Full.csv")
+    testData = testData.drop(['orderID'], 1)
+
+    testData = Toolbox.constructItemPercentageBasedOnDict(testData,joblib.load('../models/itemPercDict/itemPercDict.pkl'))
 
     # Split into train/test data
-    trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
+    # trainData, testData = Toolbox.performTrainTestSplit(data, 0.25)
 
     # construct median color/size per customer + difference
     trainData, testData = Toolbox.constructCustomerMedianSizeAndColor(trainData, testData)
@@ -239,24 +244,29 @@ def makePredictionUsingDoubleClassifiers():
     # X and Y train
     xTrain, yTrain = Toolbox.getXandYMatrix(trainData, 'returnQuantity')
     xTrainExtra, _ = Toolbox.getXandYMatrix(trainDataExtra, 'returnQuantity')
-    _, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
+    # _, yTest = Toolbox.getXandYMatrix(testData, 'returnQuantity')
 
     # Training the classifier
     classifier = ClassifierTrainer.trainClassifier(xTrain, yTrain)
     classifierExtra = ClassifierTrainer.trainClassifier(xTrainExtra, yTrain)
 
+    FileManager.saveModel(classifierExtra, 'withPercentage/gradientBoosting', 'gradientBoosting.pkl')
+    FileManager.saveModel(classifier, 'withoutPercentage/gradientBoosting', 'gradientBoosting.pkl')
+
     # todo SILVI
     yPred = TestPredictor.makePrediction(classifier, classifierExtra, testData, customerIDToPercReturnedDict,
-                                         ['customerID', 'percentageReturned', 'returnQuantity'],
-                                         ['customerID', 'returnQuantity'])
+                                         # ['customerID', 'percentageReturned', 'returnQuantity'],
+                                         ['customerID','percentageReturned','articleID'],
+                                         # ['customerID', 'returnQuantity']
+                                         ['customerID','articleID'] #no return quantity in real test set
+                                         )
 
     # yPred = classifier.predict(xTest)
     # yPred = Toolbox.predictUsingVotingClassifier(xTest)
 
-    # FileManager.saveModel(classifier,'withPercentage/gradientBoosting', 'gradientBoosting.pkl')
 
     # Assessing the performance
-    Validator.performValidation(yPred, yTest)
+    # Validator.performValidation(yPred, yTest)
     # Visualizer.plotFeatureImportance(classifier.feature_importances_,
     #                                  [col for col in trainData.columns if col != 'returnQuantity'])
 

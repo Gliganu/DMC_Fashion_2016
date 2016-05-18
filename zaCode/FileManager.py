@@ -75,11 +75,11 @@ def loadModel(foldername, filename):
     return joblib.load('../models/' + foldername + '/' + filename)
 
 
-def saveDataFrame(dataFrame, fileName):
+def saveDataFrame(dataFrame, fileName, withIndex = False):
     if not os.path.exists('../dataframes'):
         os.makedirs('../dataframes')
 
-    dataFrame.to_csv('../dataframes/' + fileName, sep='\t', index=False)
+    dataFrame.to_csv('../dataframes/' + fileName, sep='\t', index=withIndex)
 
 def loadDataFrameFromCsv(fileName, size = None):
 

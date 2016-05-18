@@ -529,6 +529,8 @@ def constructPercentageReturnColumnForSeenCustomers(trainData,testData):
 
     knownCustomerIdToPercentageReturnDict = getKnownCustomerIDToPercentageReturnDict(trainDataCopy)
 
+    
+
     trainDataCopy.loc[:, 'percentageReturned'] = trainDataCopy['customerID'].apply(
         lambda custId: knownCustomerIdToPercentageReturnDict[custId])
 
@@ -663,10 +665,11 @@ def constructCustomerMedianSizeAndColor(trainData, testData):
 def constructItemPercentageBasedOnDict(data, idToPercDict):
 
     dataCopy = data.copy()
-
-    dataCopy.loc[:, 'percentageReturned'] = dataCopy['customerID'].apply(
+    percentageReturned = dataCopy['customerID'].apply(
 
         lambda custId: idToPercDict[custId] if custId in idToPercDict else 0)
+
+    dataCopy.insert(15,'itemPercentageReturned',percentageReturned)
 
     return dataCopy
 
@@ -891,6 +894,13 @@ def dropMissingValues(data):
     return data.dropna()
 
 
+def joinPredFillZero(orders_class, pred, pred_col):
+    """
+    concatenate predictions and orders_class, fill Nans with zeros
+    """
+    orders_class[pred_col] = pred[pred_col]
+    orders_class[pred_col] = orders_class[pred_col].apply(lambda x: 0 if pd.isnull(x) else x)
+
 def fillMissingValues(data, productGroupStategy='median', rrpStrategy='mean'):
     """
     Fills the missing values in the columns which suffer from this.
@@ -906,7 +916,7 @@ def fillMissingValues(data, productGroupStategy='median', rrpStrategy='mean'):
     data.fillna(0)
     print("after  ")
     # for the voucher ID column, 6 values missing. drop them
-    data = dropMissingValues(data)
+    # data = dropMissingValues(data)
 
     return data
 
