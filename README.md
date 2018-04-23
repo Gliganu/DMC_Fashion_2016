@@ -1,10 +1,3 @@
-## Work of some UTCN Students interested in Machine Learning ##
+Code written for the Data Mining Cup 2016. https://www.data-mining-cup.com/reviews/dmc-2016/
 
-Note -- for the scripts to work you should have the following setup locally:
-
-in the root dir of the git project a folder data containing the train and test data set.
-
-
-data:
-* orders_train.txt
-* orders_class.txt
+The central topic of the DATA MINING CUP 2016 competition was the prediction of the return rates for a fashion distributor
